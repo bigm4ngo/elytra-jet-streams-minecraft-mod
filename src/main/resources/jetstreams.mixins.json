@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "dev.jetstreams.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"LivingEntityMixin",
+		"FireworkRocketEntityMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "dev.jetstreams.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"SkyRendererMixin",
+		"AtmosphericFogEnvironmentMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

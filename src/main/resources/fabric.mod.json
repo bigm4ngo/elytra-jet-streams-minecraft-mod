@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "jetstreams",
+	"version": "${version}",
+	"name": "Elytra Jet Streams",
+	"description": "High-altitude one-way jet stream highways: curving wind channels with vector-locking intersections, exponential altitude speed scaling, no-rocket cruising and predictive chunk streaming. Blends real atmospheric concepts with rewarding elytra gameplay.",
+	"authors": [
+		"Elytra Jet Streams Team"
+	],
+	"contact": {
+		"homepage": "https://github.com/YOUR-USERNAME/elytra-jet-streams",
+		"sources": "https://github.com/YOUR-USERNAME/elytra-jet-streams",
+		"issues": "https://github.com/YOUR-USERNAME/elytra-jet-streams/issues"
+	},
+	"license": "MIT",
+	"icon": "assets/jetstreams/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.jetstreams.JetStreams"
+		],
+		"client": [
+			"dev.jetstreams.client.JetStreamsClient"
+		]
+	},
+	"mixins": [
+		"jetstreams.mixins.json",
+		{
+			"config": "jetstreams.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.0",
+		"minecraft": ">=26.1 <26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
