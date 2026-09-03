@@ -73,13 +73,20 @@ public abstract class FireworkRocketEntityMixin {
         if (vanillaDelta.lengthSqr() < 1.0e-9) {
             return; // no boost was applied this tick
         }
-        double multiplier = WindField.fireworkMultiplier(p, target.getY());
+        // One-way gating: the altitude multiplier only applies ALONG the current. Across or
+        // against it (or outside any stream) the boost collapses back to vanilla physics.
+        FlightState st = FlightStateTracker.get(level, target.getUUID());
+        double multiplier = st.inStream
+                ? WindField.fireworkMultiplier(p, target.getY()) * st.alignmentFactor
+                : 1.0;
+        if (multiplier <= 1.0 + 1.0e-9) {
+            return; // vanilla-identical - nothing to rewrite
+        }
         Vec3 scaled = FlightPhysics.fireworkBoostDelta(
                 this.jetstreams$look, this.jetstreams$preVel, multiplier, p.fireworkKickPerTick);
         target.setDeltaMovement(post.subtract(vanillaDelta).add(scaled));
 
         if (!level.isClientSide() && target instanceof ServerPlayer player) {
-            FlightState st = FlightStateTracker.get(level, player.getUUID());
             st.lastBoostTick = level.getGameTime();
             // Vanilla-shaped terminal estimate: v* = 1.6666 * multiplier blocks/tick.
             double terminalBps = 1.6666 * multiplier * 20.0;

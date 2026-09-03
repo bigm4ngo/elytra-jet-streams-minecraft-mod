@@ -70,6 +70,11 @@ public class JetStreamsConfig {
         /** Per-tick horizontal drag multiplier (0..1) when flying against the current. */
         public double headwindDragPerTick = 0.008;
 
+        /** Velocity-vs-flow cosine below which the stream firework boost is fully suppressed. */
+        public double boostMinAlignment = 0.15;
+        /** Velocity-vs-flow cosine at/above which the full altitude multiplier applies. */
+        public double boostFullAlignment = 0.85;
+
         /** Sharp-turn speed bleed coefficient (0..1 per tick at max turn rate). */
         public double turnDrag = 0.9;
         /** Look yaw change (deg/tick) that counts as a sharp turn. */
@@ -113,16 +118,27 @@ public class JetStreamsConfig {
         public int preloadTicketLevel = 33;
     }
 
-    /** Local, cosmetic-only settings. Never synced. */
+    /** Local, cosmetic-only settings. Never synced - editable client side by anyone. */
     public static class Client {
         /** Exponential darkening of the sky with altitude. */
         public boolean skyTint = true;
         public double skyTintStrength = 1.0;
-        public boolean windParticles = true;
+        /** Directional stream particles that visualize where each current flows (none in dead zones). */
+        public boolean directionParticles = true;
         public double particleDensity = 1.0;
         /** Large, translucent flow-aligned cirrus bands near cruise altitude. */
         public boolean cirrusBands = true;
-        /** Subtle warm on-screen tint while flying against the current. */
+        /** Directional + neutral screen tint while gliding (one color per flow direction). */
+        public boolean streamTints = true;
+        /** Global tint strength multiplier (0..2). */
+        public double tintStrength = 0.7;
+        /** Subtle warm on-screen edge tint while flying against the current. */
         public boolean headwindIndicator = true;
+        /** Tint colors as #RRGGBB - per flow direction plus dead-zone neutral. */
+        public String tintNorth = "#7FB4FF";
+        public String tintSouth = "#FFB454";
+        public String tintEast = "#59E0A0";
+        public String tintWest = "#C77DFF";
+        public String tintNeutral = "#8C99A8";
     }
 }

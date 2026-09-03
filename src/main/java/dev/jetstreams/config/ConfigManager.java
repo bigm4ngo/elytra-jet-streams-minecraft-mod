@@ -56,6 +56,26 @@ public final class ConfigManager {
         }
     }
 
+    /**
+     * Replaces the physics section from a JSON payload (ModMenu "apply to server" or an
+     * operator command), sanitizing and persisting it. Returns false on malformed JSON.
+     */
+    public static boolean applyPhysicsJson(String json) {
+        try {
+            JetStreamsConfig.Physics parsed = GSON.fromJson(json, JetStreamsConfig.Physics.class);
+            if (parsed == null) {
+                return false;
+            }
+            config.physics = parsed;
+            sanitize();
+            save();
+            return true;
+        } catch (Exception e) {
+            JetStreams.LOGGER.error("Rejected malformed physics config", e);
+            return false;
+        }
+    }
+
     /** Clamps user-supplied values into safe ranges so a typo cannot destabilize the sim. */
     private static void sanitize() {
         JetStreamsConfig.Physics p = config.physics;
@@ -76,6 +96,8 @@ public final class ConfigManager {
         p.windBoostSpeed = clampDouble(p.windBoostSpeed, 0.0, 400.0);
         p.windAccelPerSecondSq = clampDouble(p.windAccelPerSecondSq, 0.1, 200.0);
         p.headwindDragPerTick = clampDouble(p.headwindDragPerTick, 0.0, 0.2);
+        p.boostMinAlignment = clampDouble(p.boostMinAlignment, -1.0, Math.min(0.95, p.boostFullAlignment));
+        p.boostFullAlignment = clampDouble(p.boostFullAlignment, Math.max(-0.95, p.boostMinAlignment), 1.0);
         p.turnDrag = clampDouble(p.turnDrag, 0.0, 5.0);
         p.turnAngleThresholdDeg = clampDouble(p.turnAngleThresholdDeg, 1.0, 90.0);
         p.captureAngleDeg = clampDouble(p.captureAngleDeg, 5.0, 90.0);
@@ -97,6 +119,26 @@ public final class ConfigManager {
         JetStreamsConfig.Client c = config.client;
         c.skyTintStrength = clampDouble(c.skyTintStrength, 0.0, 2.0);
         c.particleDensity = clampDouble(c.particleDensity, 0.0, 4.0);
+        c.tintStrength = clampDouble(c.tintStrength, 0.0, 2.0);
+        c.tintNorth = sanitizeColor(c.tintNorth, "#7FB4FF");
+        c.tintSouth = sanitizeColor(c.tintSouth, "#FFB454");
+        c.tintEast = sanitizeColor(c.tintEast, "#59E0A0");
+        c.tintWest = sanitizeColor(c.tintWest, "#C77DFF");
+        c.tintNeutral = sanitizeColor(c.tintNeutral, "#8C99A8");
+    }
+
+    /** Normalizes a #RRGGBB string; falls back to the default on malformed input. */
+    public static String sanitizeColor(String value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String v = value.trim();
+        if (v.startsWith("#")) {
+            v = v.substring(1);
+        }
+        boolean hex = v.length() == 6 && v.chars().allMatch(ch -> Character.isDigit(ch)
+                || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'));
+        return hex ? "#" + v.toUpperCase(java.util.Locale.ROOT) : fallback;
     }
 
     private static int clampInt(int v, int min, int max) {

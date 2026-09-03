@@ -1,23 +1,25 @@
 package dev.jetstreams.client.fx;
 
+import dev.jetstreams.client.TintPalette;
+import dev.jetstreams.registry.JetFlowOption;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.RandomSource;
 
 /**
  * A small translucent streak that drifts along the stream flow. Spawned in short chains
  * along the wind direction, chains read as elongated motion lines. Fades in fast, out slow.
+ * Tinted with the configured color for the current's cardinal direction.
  */
 public class StreakParticle extends SingleQuadParticle {
     private final float baseAlpha;
 
     protected StreakParticle(ClientLevel level, double x, double y, double z,
                              double vx, double vy, double vz, SpriteSet sprites,
-                             int lifetime, float size, float alpha) {
+                             int lifetime, float size, float alpha, int color) {
         super(level, x, y, z, vx, vy, vz, sprites.first());
         this.lifetime = lifetime;
         this.quadSize = size;
@@ -25,6 +27,10 @@ public class StreakParticle extends SingleQuadParticle {
         this.gravity = 0.0F;
         this.baseAlpha = alpha;
         this.setAlpha(0.0F);
+        this.setColor(
+                ((color >> 16) & 0xFF) / 255.0F,
+                ((color >> 8) & 0xFF) / 255.0F,
+                (color & 0xFF) / 255.0F);
     }
 
     @Override
@@ -49,7 +55,7 @@ public class StreakParticle extends SingleQuadParticle {
         return SingleQuadParticle.Layer.TRANSLUCENT;
     }
 
-    public static class Provider implements ParticleProvider<SimpleParticleType> {
+    public static class Provider implements ParticleProvider<JetFlowOption> {
         private final SpriteSet sprites;
 
         public Provider(SpriteSet sprites) {
@@ -57,13 +63,15 @@ public class StreakParticle extends SingleQuadParticle {
         }
 
         @Override
-        public Particle createParticle(SimpleParticleType type, ClientLevel level,
+        public Particle createParticle(JetFlowOption type, ClientLevel level,
                                        double x, double y, double z,
                                        double vx, double vy, double vz, RandomSource random) {
-            int lifetime = 20 + random.nextInt(18);
-            float size = 0.12F + random.nextFloat() * 0.16F;
-            float alpha = 0.10F + random.nextFloat() * 0.08F;
-            return new StreakParticle(level, x, y, z, vx, vy, vz, this.sprites, lifetime, size, alpha);
+            int lifetime = 22 + random.nextInt(20);
+            float size = 0.14F + random.nextFloat() * 0.18F;
+            float alpha = 0.16F + random.nextFloat() * 0.10F;
+            int color = TintPalette.forDirection(type.direction());
+            return new StreakParticle(level, x, y, z, vx, vy, vz, this.sprites,
+                    lifetime, size, alpha, color);
         }
     }
 }

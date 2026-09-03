@@ -8,12 +8,13 @@ import dev.jetstreams.field.WindSample;
 import dev.jetstreams.physics.FlightState;
 import dev.jetstreams.physics.FlightStateTracker;
 import dev.jetstreams.physics.PhysicsResolver;
+import dev.jetstreams.registry.JetFlowOption;
+import dev.jetstreams.registry.ModParticles;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,9 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Client-side FX spawner. All positions derive from the deterministic flow field, so the
  * visuals always agree with the physics without any server packets.
  *
- * <p>Budgets: a handful of streaks per tick near the glider and a sparse cirrus lattice
- * near cruise altitude, both scaled by {@code particleDensity}. Costs are negligible and
- * no FX runs at all below the stream activation altitude.
+ * <p>Directional stream particles: colored, flow-aligned streaks rendered above the
+ * activation altitude wherever a current flows - and nowhere else. Dead zones stay visually
+ * silent ("none for neutral"). Budgets scale with {@code particleDensity}; no FX runs at
+ * all below the stream activation altitude.
  */
 public final class StreamParticleSpawner {
     private static final RandomSource RANDOM = RandomSource.create();
@@ -46,7 +48,7 @@ public final class StreamParticleSpawner {
         JetStreamsConfig cfg = ConfigManager.get();
         JetStreamsConfig.Physics p = PhysicsResolver.activeFor(level);
         JetStreamsConfig.Client c = cfg.client;
-        if (!p.enabled || (!c.windParticles && !c.cirrusBands)) {
+        if (!p.enabled || (!c.directionParticles && !c.cirrusBands)) {
             return;
         }
         if (!WindField.enabledFor(level, p) || player.getY() < p.activationAltitude) {
@@ -56,17 +58,20 @@ public final class StreamParticleSpawner {
         long now = level.getGameTime();
         WindSample s = WindField.sample(level, player.getX(), player.getZ(), p);
         FlightState st = FlightStateTracker.get(level, player.getUUID());
-        boolean flying = player.isFallFlying();
 
-        // ------------------------------------------------------------ streaks
-        if (c.windParticles && flying && s.hasWind() && st.dominantFamily >= 0) {
+        // ------------------------------------------------- directional stream FX
+        // Spawns whether gliding or not, so players can read the currents around them
+        // from any vantage point up high. Dead zones emit nothing.
+        if (c.directionParticles && st.dominantFamily >= 0 && s.hasWind()) {
             double profile = Math.max(s.profile(st.dominantFamily), st.windProfile);
-            if (profile > 0.1) {
+            if (profile > 0.05) {
                 double wx = s.flowX(st.dominantFamily);
                 double wz = s.flowZ(st.dominantFamily);
-                int count = (int) Math.ceil(2.0 * c.particleDensity * (0.4 + profile));
+                int dir = st.flowDir >= 0 ? st.flowDir : flowDirOf(wx, wz);
+                double rate = (flying(player) ? 2.4 : 1.2) * c.particleDensity * (0.5 + profile);
+                int count = (int) rate + (RANDOM.nextDouble() < (rate - (int) rate) ? 1 : 0);
                 for (int i = 0; i < count; i++) {
-                    spawnStreak(level, player, wx, wz, profile);
+                    spawnStreak(level, player, wx, wz, profile, dir);
                 }
             }
         }
@@ -83,21 +88,34 @@ public final class StreamParticleSpawner {
         }
     }
 
-    private static void spawnStreak(ClientLevel level, LocalPlayer player, double wx, double wz, double profile) {
-        // Bias the ring downwind so streaks appear ahead of the flight path.
-        double ahead = 8.0 + RANDOM.nextDouble() * 22.0;
-        double side = (RANDOM.nextDouble() - 0.5) * 22.0;
-        double dy = (RANDOM.nextDouble() - 0.35) * 10.0;
+    private static boolean flying(LocalPlayer player) {
+        return player.isFallFlying();
+    }
+
+    private static int flowDirOf(double wx, double wz) {
+        if (Math.abs(wx) >= Math.abs(wz)) {
+            return wx >= 0.0 ? JetFlowOption.EAST : JetFlowOption.WEST;
+        }
+        return wz >= 0.0 ? JetFlowOption.SOUTH : JetFlowOption.NORTH;
+    }
+
+    private static void spawnStreak(ClientLevel level, LocalPlayer player,
+                                    double wx, double wz, double profile, int dir) {
+        // Bias the ring downwind so streaks appear along and ahead of the flow path.
+        double ahead = 6.0 + RANDOM.nextDouble() * 26.0;
+        double side = (RANDOM.nextDouble() - 0.5) * 28.0;
+        double dy = (RANDOM.nextDouble() - 0.35) * 12.0;
         double px = -wz; // perpendicular
         double pz = wx;
         double x = player.getX() + wx * ahead + px * side;
         double y = player.getY() + dy;
         double z = player.getZ() + wz * ahead + pz * side;
-        double speed = 0.5 + RANDOM.nextDouble() * 0.7 * (0.4 + profile); // b/t along flow
-        // Chain of 3 particles along the flow reads as one elongated streak.
-        for (int k = 0; k < 3; k++) {
-            double off = k * 0.8;
-            level.addParticle(dev.jetstreams.registry.ModParticles.JET_STREAK,
+        double speed = 0.6 + RANDOM.nextDouble() * 0.8 * (0.4 + profile); // b/t along flow
+        // Longer chains (5 particles along the flow) read clearly as direction arrows.
+        JetFlowOption option = new JetFlowOption(dir);
+        for (int k = 0; k < 5; k++) {
+            double off = k * 0.9;
+            level.addParticle(option,
                     x + wx * off, y, z + wz * off,
                     wx * speed, 0.0, wz * speed);
         }
@@ -136,7 +154,7 @@ public final class StreamParticleSpawner {
                 double y = p.cruiseStartAltitude - 100.0 + band * 250.0
                         + (FieldRandom.hash01(seed, 0xC4, cx * 13 + cz) - 0.5) * 120.0;
                 double speed = 0.015 + FieldRandom.hash01(seed, 0xC5, cx + cz) * 0.02;
-                level.addParticle(dev.jetstreams.registry.ModParticles.CIRRUS_BAND,
+                level.addParticle(ModParticles.CIRRUS_BAND,
                         centerX, y, centerZ, wx * speed, 0.0, wz * speed);
                 CIRRUS_COOLDOWN.put(key, now + CIRRUS_CELL_COOLDOWN);
                 attempts++;

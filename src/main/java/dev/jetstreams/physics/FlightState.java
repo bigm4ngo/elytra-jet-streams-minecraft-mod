@@ -43,6 +43,16 @@ public class FlightState {
     public double windZ;
     public double windProfile;
 
+    /** Cosine between travel direction and the dominant current (1 = perfectly with-flow). */
+    public double alignment;
+    /**
+     * Multiplier factor [0,1] derived from {@link #alignment}: stream speed bonuses
+     * (firework multiplier + cruise) only apply ALONG the current, never across or against it.
+     */
+    public double alignmentFactor;
+    /** Cardinal flow direction of the dominant current: 0=N(-Z), 1=S(+Z), 2=E(+X), 3=W(-X), -1=none. */
+    public int flowDir = -1;
+
     /** Game time of the last firework boost application (drives {@link #isBoosting(long)}). */
     public long lastBoostTick = Long.MIN_VALUE;
 

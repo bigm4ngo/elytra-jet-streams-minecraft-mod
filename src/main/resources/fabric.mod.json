@@ -21,6 +21,9 @@
 		],
 		"client": [
 			"dev.jetstreams.client.JetStreamsClient"
+		],
+		"modmenu": [
+			"dev.jetstreams.client.compat.ModMenuIntegration"
 		]
 	},
 	"mixins": [

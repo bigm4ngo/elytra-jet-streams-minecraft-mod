@@ -1,6 +1,6 @@
 # Architecture & Design Notes
 
-Technical reference for contributors. Version 1.0.0, Minecraft 26.1.x / Fabric.
+Technical reference for contributors. Version 1.1.0, Minecraft 26.1.x / Fabric.
 
 ```
 ┌────────────────────────────  common (both sides)  ──────────────────────────┐
@@ -14,7 +14,9 @@ Technical reference for contributors. Version 1.0.0, Minecraft 26.1.x / Fabric.
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────  client (cosmetic only)  ───────────────────────┐
 │ fx/      StreamParticleSpawner · StreakParticle · CirrusParticle            │
-│ hud/     HeadwindHud (Fabric HudElement)                                    │
+│ hud/     StreamOverlayHud (Fabric HudElement)                              │
+│ gui/     JetStreamsConfigScreen + LabelWidget (ModMenu config UI)          │
+│ compat/  ModMenuIntegration (optional ModMenu entrypoint)                  │
 │ mixin/   SkyRendererMixin · AtmosphericFogEnvironmentMixin → SkyTint        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -105,6 +107,12 @@ Instead (`FireworkRocketEntityMixin` + `FlightPhysics.fireworkBoostDelta`):
 - the per-tick delta is length-clamped (`fireworkKickPerTick`, 2.5 b/t) so a fresh rocket
   at extreme altitude is a sustained burn rather than a catapult.
 
+**One-way gate (v1.1.0):** `m` is really `altitudeMult · alignmentFactor`, where
+`alignmentFactor` is a smoothstep of the cosine between the player's velocity and the
+dominant flow, mapped over `[boostMinAlignment, boostFullAlignment]` (0.15 → 0.85).
+Against/across the stream — or anywhere outside a stream — the factor is 0 and rockets are
+vanilla. FlightPhysics computes it per tick from pre-push velocity; the mixin reads it.
+
 Implementation is a differential HEAD/TAIL inject around `FireworkRocketEntity.tick`:
 capture pre-velocity + look, then *replace* the applied delta — robust against exact
 formula drift and identical on both sides.
@@ -123,6 +131,10 @@ Equilibrium is level flight (|vy| ≤ 0.5 b/s) with a bounded, gentle climb/dive
 steering — and hard escapes: sneak (brake + release) or pitch beyond `divePitchDeg` (40°).
 Cruise also pulls the along-wind velocity component toward `cruiseSpeed(y)` at `cruiseGain`
 per tick, so cruising *is* riding the current; fighting it disengages lift.
+
+**Axis lock (v1.1.0):** each cruise tick decays the cross-flow velocity component ×0.90,
+projecting the horizontal velocity onto the stream axis — cruise speed can only ever be
+carried *along* the current, never sideways across it.
 
 ## 6. Chunk corridor pre-loader
 
@@ -152,9 +164,12 @@ At the default top speed (~390 b/s ≈ 24 chunks/s), a 3-wide corridor at 3 tick
 
 ## 8. FX budgets
 
-- Streaks: ≤ ~6 spawns/tick while in-stream (3-particle chains), lifetime 20–38 t.
+- Streaks: ≤ ~5 spawns/tick while in-stream (5-particle chains, colored per flow direction
+  via the `jet_streak` particle's `JetFlowOption` data), lifetime 22–42 t; none in dead zones.
 - Cirrus: 256-block lattice, hashed sparsity, per-cell cooldown 1200 t, ≤ 2 spawns/sweep,
   lifetime 400–800 t; only inside stream cores, only near cruise altitudes.
+- Direction tints: one full-screen ARGB fill per frame (alpha ≤ 90·strength); headwind edge:
+  two gradient fills.
 - Sky tint & fog: one ARGB lerp per frame each.
 - Everything is disabled below `activationAltitude` and when the local dimension is
   disabled.

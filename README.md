@@ -63,6 +63,15 @@ family as the thrust multiplier. Cruise is a *stream* privilege: it disengages w
 leave the core, dive (**pitch > 40°**), or **sneak**, which also gently brakes. Getting
 out of a stream is always one deliberate move — never a trap.
 
+### One-way, by design
+Streams are **one-way highways**. Stream speed — both the firework altitude multiplier and
+no-rocket cruise — only applies while you travel **along** the current:
+
+- fly against or across a stream (or in a dead zone) and rockets behave exactly like vanilla,
+  with headwind drag punishing the fight, and
+- cruise axis-locks your velocity onto the stream, so its speed can never be carried sideways
+  or backwards. The current decides the direction; you decide the pitch.
+
 ### Vector locking at intersections
 When an eastbound stream crosses a northbound one, the first current you entered **locks**:
 cross-forces from the other stream are suppressed and you glide straight through.
@@ -77,17 +86,20 @@ bleeds momentum — take the curves wide or drop out of the stream to slow down.
 
 ## 🎨 Player experience
 
-- **Wind streaks** — subtle translucent particles drifting along the flow, spawned in
-  short chains so they read as elongated motion lines.
+- **Directional stream particles** — colored streak chains drift along each current's flow,
+  reading as motion arrows you can navigate by. They spawn *only where a current flows* —
+  dead zones are visually silent. Colors match the tint palette.
 - **Cirrus bands** — huge, faint flow-aligned cloud puffs near cruise altitude, placed on
   a deterministic lattice that matches the actual stream layout.
 - **Sky darkening** — the sky deepens toward navy exponentially with altitude
   (`1 − e^(−k·(y−300))`, ~88% darkening at y=8000), horizon fog included.
-- **Current indicator** — a small chevron under the crosshair rotates with the stream's
-  flow relative to your view, and a faint warm tint creeps in at the screen edges while
+- **Direction tints** — while gliding, a subtle screen tint tells you which cardinal
+  direction the current carries you (N/S/E/W, colors configurable) and a softer neutral
+  tone appears in dead zones.
+- **Headwind indicator** — a faint warm tint creeps in at the screen edges while
   you fight a headwind.
 
-All FX are client-side, budgeted, and disabled below the activation altitude.
+All FX are client-side, toggleable, budgeted, and disabled below the activation altitude.
 
 ## 🚀 Performance (built for 390 b/s)
 
@@ -124,7 +136,8 @@ corridor travel; the preloader's per-tick budget spreads the rest of the work ou
 ## 🎮 How to fly it
 
 1. Craft fireworks and an elytra as usual.
-2. Climb above **y = 300** — look for drifting streaks; you're in a stream.
+2. Climb above **y = 300** — look for drifting colored streaks; you're in a stream. Their
+   direction *is* the current.
 3. Above **y = 2000**, align with the flow and level off: the stream lifts you.
 4. Fire rockets to accelerate; the higher you are, the harder they push.
 5. At a crossing, keep your lane or steer into the other current for a moment to switch.
@@ -142,7 +155,22 @@ Everything lives in `config/jetstreams.json` (created on first launch, hot-reloa
 `/jetstreams reload`). Physics values are server-authoritative and synced to clients;
 cosmetic values stay local.
 
-### `physics` (synced)
+### 🖱 In-game config screen (ModMenu)
+
+Install [ModMenu](https://modrinth.com/mod/modmenu) and its **ModMenu → Elytra Jet Streams →
+Configure** screen gives you three tabs:
+
+- **Visuals** — every cosmetic toggle, the particle density, tint strength, and per-direction
+  color pickers. Editable client side by **anyone**, applied instantly.
+- **Flight speed** and **World & perf** — the full physics config, including the activation
+  altitude `k` constant. Changes are submitted to the server, which only accepts them from
+  the singleplayer owner or a server **operator**; without permission the server rejects the
+  change with a chat message. Applied settings are saved, re-validated and re-synced to
+  every connected player.
+
+ModMenu is **optional** — the mod works fine without it (edit the JSON instead).
+
+### `physics` (synced, operator-editable via ModMenu)
 
 | Key | Default | Description |
 |---|---:|---|
@@ -158,6 +186,8 @@ cosmetic values stay local.
 | `multiplierRate` | `0.00032` | Exponential rate of the rocket multiplier. |
 | `speedCapAltitude` | `8000` | Altitude where multiplier & cruise speed peak. |
 | `fireworkKickPerTick` | `2.5` | Max boost delta per tick (b/t) — smooths the high-altitude kick. |
+| `boostMinAlignment` | `0.15` | Velocity-vs-flow cosine below which the stream boost is suppressed. |
+| `boostFullAlignment` | `0.85` | Cosine at/above which the full multiplier applies. |
 | `cruiseStartAltitude` | `2000` | Where no-rocket cruise begins. |
 | `cruiseSpeedBase` / `Peak` | `20` / `100` | Cruise speed (b/s) at start / cap altitude. |
 | `cruiseGain` | `0.08` | Per-tick approach rate toward cruise speed. |
@@ -183,15 +213,19 @@ cosmetic values stay local.
 | `hypersonicFreeze` | `true` | No new chunks at/above the hypersonic threshold. |
 | `preloadExpiryTicks` | `600` | Ticket lifetime (ticks). |
 
-### `client` (local)
+### `client` (local — editable by anyone via ModMenu)
 
 | Key | Default | Description |
 |---|---:|---|
 | `skyTint` / `skyTintStrength` | `true` / `1.0` | Exponential altitude sky darkening. |
-| `windParticles` | `true` | Flow streak particles. |
+| `directionParticles` | `true` | Directional stream particles (none in dead zones). |
 | `particleDensity` | `1.0` | Global FX density multiplier. |
 | `cirrusBands` | `true` | Flow-aligned cirrus puffs near cruise altitude. |
-| `headwindIndicator` | `true` | Edge tint + flow chevron. |
+| `streamTints` | `true` | Per-direction screen tint while gliding. |
+| `tintStrength` | `0.7` | Global tint strength multiplier (0–2). |
+| `tintNorth` / `South` / `East` / `West` | `#7FB4FF` / `#FFB454` / `#59E0A0` / `#C77DFF` | Stream tint per flow direction. |
+| `tintNeutral` | `#8C99A8` | Dead-zone neutral tint. |
+| `headwindIndicator` | `true` | Warm edge tint while fighting a headwind. |
 
 ## 🛠 Building from source
 
@@ -224,4 +258,4 @@ authoritative).
 
 [MIT](LICENSE) — free to use, study, modify and redistribute with attribution.
 
-<div align="center"><sub>Designed for Minecraft 26.1.x · Fabric · v1.0.0</sub></div>
+<div align="center"><sub>Designed for Minecraft 26.1.x · Fabric · v1.1.0</sub></div>

@@ -4,7 +4,7 @@ import dev.jetstreams.JetStreams;
 import dev.jetstreams.client.fx.CirrusParticle;
 import dev.jetstreams.client.fx.StreakParticle;
 import dev.jetstreams.client.fx.StreamParticleSpawner;
-import dev.jetstreams.client.hud.HeadwindHud;
+import dev.jetstreams.client.hud.StreamOverlayHud;
 import dev.jetstreams.client.mixinhooks.SkyTint;
 import dev.jetstreams.registry.ModParticles;
 import net.fabricmc.api.ClientModInitializer;
@@ -23,7 +23,7 @@ public class JetStreamsClient implements ClientModInitializer {
         ParticleProviderRegistry.getInstance().register(ModParticles.CIRRUS_BAND, CirrusParticle.Provider::new);
 
         ClientTickEvents.END_CLIENT_TICK.register(StreamParticleSpawner::tick);
-        HeadwindHud.register();
+        StreamOverlayHud.register();
 
         JetStreams.LOGGER.info("Elytra Jet Streams client initialized");
     }

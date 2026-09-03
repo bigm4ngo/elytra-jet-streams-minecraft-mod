@@ -4,9 +4,8 @@ plugins {
 }
 
 repositories {
-	// Add repositories to retrieve artifacts from in here.
-	// You should only use this when depending on other mods because
-	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
+	// ModMenu (optional integration - compile only, not shipped or required at runtime).
+	maven { url = "https://maven.terraformersmc.com/releases/" }
 }
 
 loom {
@@ -33,6 +32,10 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Optional ModMenu integration: compiled against but not required at runtime.
+	// (Loom 1.17 auto-remaps mod jars on the standard configurations.)
+	clientCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 processResources {

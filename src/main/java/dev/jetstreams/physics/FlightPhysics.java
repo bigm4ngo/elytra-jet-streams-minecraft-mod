@@ -79,6 +79,18 @@ public final class FlightPhysics {
         st.windZ = wz;
         st.windProfile = profile;
 
+        // --- one-way gating: stream speed applies only ALONG the current ---
+        // The cosine between the travel direction and the flow drives a smoothstep factor
+        // that scales the firework multiplier; against/across the stream it collapses to 0
+        // (vanilla rocket physics) while the existing headwind drag punishes fighting it.
+        double vhPre = Math.hypot(vx, vz);
+        double dot = vhPre > 0.5 ? Mth.clamp((vx * wx + vz * wz) / vhPre, -1.0, 1.0) : 1.0;
+        st.alignment = dot;
+        double a = (dot - p.boostMinAlignment) / Math.max(1e-6, p.boostFullAlignment - p.boostMinAlignment);
+        a = Mth.clamp(a, 0.0, 1.0);
+        st.alignmentFactor = profile > 0.0 ? a * a * (3.0 - 2.0 * a) : 0.0;
+        st.flowDir = profile > 0.0 ? flowDirIndex(wx, wz) : -1;
+
         if (s.region() == RegionType.CROSSING && st.dominantFamily >= 0) {
             updateLock(st, entity, s, horizBps, p, dt);
         } else {
@@ -141,6 +153,13 @@ public final class FlightPhysics {
                     vx += wx * delta;
                     vz += wz * delta;
                 }
+                // Stream axis lock: decay the cross-flow velocity component so cruise
+                // speed can only be carried ALONG the current, never sideways across it.
+                double along = vx * wx + vz * wz;
+                double crossX = vx - wx * along;
+                double crossZ = vz - wz * along;
+                vx = wx * along + crossX * 0.90;
+                vz = wz * along + crossZ * 0.90;
                 st.cruising = true;
             } else if (sneaking) {
                 // Sneak = gentle brake to descend out of the current.
@@ -217,6 +236,16 @@ public final class FlightPhysics {
             st.switchProgress = 0.0;
             st.lockCooldown = p.captureCooldownSeconds;
         }
+    }
+
+    /** Maps a unit flow vector to a cardinal direction: 0=N(-Z), 1=S(+Z), 2=E(+X), 3=W(-X). */
+    private static int flowDirIndex(double wx, double wz) {
+        if (Math.abs(wx) >= Math.abs(wz)) {
+            return wx >= 0.0 ? dev.jetstreams.registry.JetFlowOption.EAST
+                             : dev.jetstreams.registry.JetFlowOption.WEST;
+        }
+        return wz >= 0.0 ? dev.jetstreams.registry.JetFlowOption.SOUTH
+                         : dev.jetstreams.registry.JetFlowOption.NORTH;
     }
 
     /**
