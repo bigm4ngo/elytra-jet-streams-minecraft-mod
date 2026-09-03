@@ -1,26 +1,26 @@
 package dev.jetstreams.field;
 
 /**
- * Result of sampling the wind field at one world column.
+ * Result of sampling the wind field at one world position.
  *
- * <p>Two band families exist:
+ * <p>Two tunnel families exist (v1.2.0 3D tunnel field):
  * <ul>
- *   <li><b>NS bands</b> &mdash; strips that run north&ndash;south; their wind flows along Z
- *       (north or south). Membership varies with world X.</li>
- *   <li><b>EW bands</b> &mdash; strips that run east&ndash;west; their wind flows along X
- *       (east or west). Membership varies with world Z.</li>
+ *   <li><b>NS tunnels</b> &mdash; horizontal tubes whose wind flows along Z
+ *       (north or south).</li>
+ *   <li><b>EW tunnels</b> &mdash; horizontal tubes whose wind flows along X
+ *       (east or west).</li>
  * </ul>
  *
- * @param ns        true when the position is inside an NS band's stream core
- * @param nsProfile lateral strength profile in [0,1] (1 at the centerline, 0 at the edge)
+ * @param ns        true when the position is inside an NS tunnel
+ * @param nsProfile elliptical cross-section profile in [0,1] (1 at the axis, 0 at the rim)
  * @param nsFlowX   X component of the NS flow unit vector
  * @param nsFlowZ   Z component of the NS flow unit vector
- * @param nsBand    band index along the X axis
- * @param ew        true when the position is inside an EW band's stream core
- * @param ewProfile lateral strength profile in [0,1]
+ * @param nsBand    tunnel id (slot hash) of the NS tunnel candidate, 0 when none
+ * @param ew        true when the position is inside an EW tunnel
+ * @param ewProfile elliptical cross-section profile in [0,1]
  * @param ewFlowX   X component of the EW flow unit vector
  * @param ewFlowZ   Z component of the EW flow unit vector
- * @param ewBand    band index along the Z axis
+ * @param ewBand    tunnel id (slot hash) of the EW tunnel candidate, 0 when none
  * @param region    combined region classification
  */
 public record WindSample(

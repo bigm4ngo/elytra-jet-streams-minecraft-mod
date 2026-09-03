@@ -62,7 +62,7 @@ public final class FlightPhysics {
             return;
         }
 
-        WindSample s = WindField.sample(level, entity.getX(), entity.getZ(), p);
+        WindSample s = WindField.sample(level, entity.getX(), y, entity.getZ(), p);
         Vec3 vel = entity.getDeltaMovement();
         double vx = vel.x;
         double vy = vel.y;
@@ -131,19 +131,21 @@ public final class FlightPhysics {
             st.headwindFactor *= 0.85;
         }
 
-        // --- no-rocket cruise inside the stream core ---
+        // --- no-rocket cruise: inside stream cores (fast, along-flow) or in neutral
+        // --- zones up high (slow, any direction)
         st.cruising = false;
-        if (profile >= p.coreProfileForCruise && y >= p.cruiseStartAltitude) {
-            boolean sneaking = player.isShiftKeyDown();
-            boolean diving = entity.getXRot() > (float) p.divePitchDeg;
+        st.cruiseKind = 0;
+        boolean sneaking = player.isShiftKeyDown();
+        boolean diving = entity.getXRot() > (float) p.divePitchDeg;
+        // Cancel the gravity sag vanilla just applied at this pitch:
+        // updateFallFlyingMovement adds gravity * (-1 + 0.75 * cos^2(pitch)).
+        double pitchRad = Math.toRadians(entity.getXRot());
+        double lift = Math.cos(pitchRad) * Math.cos(pitchRad);
+        double sag = p.gravityCompensationPerTick * (-1.0 + lift * 0.75);
+        if (profile >= p.coreProfileForCruise && y >= p.cruiseStartAltitude && !sneaking && !diving) {
             double vh = Math.hypot(vx, vz);
             boolean withFlow = vh < 0.05 || (vx * wx + vz * wz) / vh > 0.35;
-            if (!sneaking && !diving && withFlow) {
-                // Cancel the gravity sag vanilla just applied at this pitch:
-                // updateFallFlyingMovement adds gravity * (-1 + 0.75 * cos^2(pitch)).
-                double pitchRad = Math.toRadians(entity.getXRot());
-                double lift = Math.cos(pitchRad) * Math.cos(pitchRad);
-                double sag = p.gravityCompensationPerTick * (-1.0 + lift * 0.75);
+            if (withFlow) {
                 vy = Mth.clamp((vy - sag) * 0.918, -0.025, 0.05);
                 if (!boosting) {
                     // Pull the along-wind speed component toward the cruise curve.
@@ -161,11 +163,41 @@ public final class FlightPhysics {
                 vx = wx * along + crossX * 0.90;
                 vz = wz * along + crossZ * 0.90;
                 st.cruising = true;
-            } else if (sneaking) {
-                // Sneak = gentle brake to descend out of the current.
-                vx *= 0.98;
-                vz *= 0.98;
+                st.cruiseKind = 1;
             }
+        }
+        if (!st.cruising && !s.hasWind() && y >= p.neutralCruiseStartAltitude
+                && !sneaking && !diving) {
+            // Neutral-zone cruise: no current exists here, so direction is free - but the
+            // pace is much slower than tunnel cruise. Same gravity cancel, same escapes.
+            vy = Mth.clamp((vy - sag) * 0.918, -0.025, 0.05);
+            if (!boosting) {
+                double vh = Math.hypot(vx, vz);
+                double targetBt = WindField.neutralCruiseSpeed(p, y) / 20.0;
+                if (vh > 0.05) {
+                    // Pull the horizontal speed (any direction) toward the neutral curve.
+                    double newVh = vh + Mth.clamp((targetBt - vh) * p.cruiseGain, -0.2, 0.2);
+                    double scale = newVh / vh;
+                    vx *= scale;
+                    vz *= scale;
+                } else {
+                    // Standing still: nudge along the look direction so cruise can start.
+                    Vec3 look = entity.getLookAngle();
+                    double lh = Math.hypot(look.x, look.z);
+                    if (lh > 0.05) {
+                        double push = targetBt * p.cruiseGain;
+                        vx += look.x / lh * push;
+                        vz += look.z / lh * push;
+                    }
+                }
+            }
+            st.cruising = true;
+            st.cruiseKind = 2;
+        }
+        if (sneaking) {
+            // Sneak = gentle brake to descend out of the current.
+            vx *= 0.98;
+            vz *= 0.98;
         }
 
         entity.setDeltaMovement(vx, vy, vz);

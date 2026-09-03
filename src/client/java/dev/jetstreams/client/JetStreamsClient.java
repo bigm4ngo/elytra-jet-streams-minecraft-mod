@@ -21,8 +21,9 @@ public class JetStreamsClient implements ClientModInitializer {
 
         ParticleProviderRegistry.getInstance().register(ModParticles.JET_STREAK, StreakParticle.Provider::new);
         ParticleProviderRegistry.getInstance().register(ModParticles.CIRRUS_BAND, CirrusParticle.Provider::new);
+        ParticleProviderRegistry.getInstance().register(ModParticles.RIM_MARKER, StreakParticle.RimProvider::new);
 
-        ClientTickEvents.END_CLIENT_TICK.register(StreamParticleSpawner::tick);
+        StreamParticleSpawner.register();
         StreamOverlayHud.register();
 
         JetStreams.LOGGER.info("Elytra Jet Streams client initialized");

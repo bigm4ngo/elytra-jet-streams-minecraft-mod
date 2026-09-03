@@ -51,22 +51,30 @@ public final class JetStreamsCommand {
         double y = player.getY();
         double mult = WindField.fireworkMultiplier(p, y);
         double cruise = WindField.cruiseSpeed(p, y);
-        var s = WindField.sample(level, player.getX(), player.getZ(), p);
+        double neutral = WindField.neutralCruiseSpeed(p, y);
+        var s = WindField.sample(level, player.getX(), y, player.getZ(), p);
+        var hit = WindField.tunnelHit(level, player.getX(), y, player.getZ(), p);
 
         String region = switch (s.region()) {
-            case NS_STREAM -> "N/S stream";
-            case EW_STREAM -> "E/W stream";
+            case NS_STREAM -> "N/S tunnel";
+            case EW_STREAM -> "E/W tunnel";
             case CROSSING -> "crossing (locked: " + (st.dominantFamily == 0 ? "N/S" : "E/W") + ")";
-            case DEAD_ZONE -> "dead zone";
+            case DEAD_ZONE -> "neutral zone";
         };
         double speedBps = Math.hypot(player.getDeltaMovement().x, player.getDeltaMovement().z) * 20.0;
 
         player.sendSystemMessage(Component.literal("§9Elytra Jet Streams§r — y=" + String.format(Locale.ROOT, "%.0f", y)));
         player.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
                 " region: %s, profile=%.2f", region, st.windProfile)));
+        if (hit != null) {
+            player.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
+                    " tunnel: %dx%d blocks, %d long, axis y=%.0f, %.0f%% through",
+                    (int) (hit.halfW() * 2), (int) (hit.halfH() * 2), (int) (hit.halfL() * 2),
+                    hit.yCenter(), hit.u01() * 100.0)));
+        }
         player.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
-                " speed: %.1f b/s | rocket x%.2f | cruise target: %.1f b/s",
-                speedBps, mult, cruise)));
+                " speed: %.1f b/s | rocket x%.2f | tunnel cruise: %.1f b/s | neutral cruise: %.1f b/s (from y=%.0f)",
+                speedBps, mult, cruise, neutral, p.neutralCruiseStartAltitude)));
         player.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
                 " state: cruising=%s headwind=%s hypersonic=%s (≥%.0f b/s) turn=%.1f°/t",
                 st.cruising, st.headwind, st.hypersonic, p.hypersonicSpeed, st.turnRate)));

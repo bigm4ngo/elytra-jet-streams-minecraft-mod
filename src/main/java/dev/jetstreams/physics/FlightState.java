@@ -27,8 +27,10 @@ public class FlightState {
     /** Speed (b/s) the server considers physically possible for this player right now. */
     public double authorizedSpeedBps;
 
-    /** True when the player is inside a stream core holding no-rocket cruise. */
+    /** True when the player is holding no-rocket cruise (in a stream core or neutral zone). */
     public boolean cruising;
+    /** Cruise flavor: 0 = none, 1 = in-tunnel stream cruise, 2 = neutral-zone cruise. */
+    public int cruiseKind;
     /** True while inside any stream wind. */
     public boolean inStream;
     /** True while flying against the dominant current (drives the headwind indicator). */

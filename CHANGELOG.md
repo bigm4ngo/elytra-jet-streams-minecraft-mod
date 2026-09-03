@@ -3,6 +3,58 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] — 2026-09-01
+
+The 3D tunnel revamp: streams become finite elliptical **tubes** in a calm sky, plus a
+colour wheel, cleaner config authority, and much louder borders.
+
+### Added
+- **3D jet stream tunnels** (replaces the 2D band grid):
+  - streams are now finite, meandering **elliptical tunnels** with true vertical extent —
+    100–300 blocks wide × 100–150 tall near y=300, growing smoothly (bell-distributed,
+    smoothstep lerp with altitude) to 1000–5000 × 600–2000 at y=6000+;
+  - lengths follow the same bell curves: 500–2000 blocks at the bottom, 8000+ up high,
+    with a rare fat tail producing 10k–20k+ monsters in the upper sky;
+  - **all air between tunnels is neutral zone** — gap-first spacing guarantees the
+    configured wall-to-wall gap (≥1000 around a 5000-wide tunnel), with probabilistic
+    existence (default 70%) so encounters feel organic: roughly one tunnel every ~300
+    blocks at y=300, every 1.5k–2k at y=6000+;
+  - tunnels are **fully isolated** (ends land wherever the dice put them) — finding the
+    next one is the navigation challenge;
+  - sampling stays O(1): two hash lookups per sample, memoized tunnels, no storage.
+- **Neutral-zone cruise**: above **y=4000** (configurable) you can cruise without rockets
+  even outside streams — starting at **20 b/s** and rising exponentially to ~34 b/s at
+  y=8000. Any direction works in neutral air (there's no current to fight), but it stays
+  much slower than in-tunnel cruise, and the usual escapes (sneak, dive) still apply.
+  Traveling against a tunnel's current still grants nothing.
+- **Colour wheel editor**: every tint slot (N/S/E/W + neutral) opens an HSV colour wheel —
+  click/drag to pick hue + saturation, brightness slider, live preview swatch and hex
+  readout. Cancel restores the previous colour.
+- **Rim markers**: big, bright particles line each tunnel's elliptical border, biased along
+  the player's own heading so the wall *ahead* lights up; near a tunnel in neutral air, its
+  near rim is lit to advertise the mouth. New `rim_marker` particle type.
+- `/jetstreams info` now prints the tunnel you're in (dimensions, axis altitude, progress)
+  and both cruise targets (tunnel + neutral).
+
+### Changed
+- **ModMenu screen is visuals-only**: flight-speed and world/perf physics pages were
+  removed. Physics values are now file-only (edit `config/jetstreams.json` +
+  `/jetstreams reload`), removing the C2S `update_physics` channel entirely; the
+  server-authoritative sync (`sync_physics`) is unchanged.
+- **Flow streaks are bigger and brighter** (0.26–0.46 blocks, ~2× the alpha) and spawn
+  *inside tunnels only*, aligned to the meandered flow; particle density now scales 0–6.
+- **Cirrus clouds actually work now** (fix): they spawn inside large tunnels at cloud-
+  visible alpha (0.10–0.17) instead of the old lattice that placed unreachable 5%-alpha
+  billboards near y=1900–2650.
+- Config: `streamWidthMin/Max`, `deadZoneMin/Max`, `meanderAmplitude/Wavelength` replaced
+  by the `tunnel*` family (old keys are ignored safely on migration); new
+  `neutralCruise*` keys; `tunnelScaleBaseAltitude`/`tunnelScaleAltitude` drive the
+  smoothstep altitude curves.
+
+### Fixed
+- Cirrus bands were practically invisible (spawned too high, alpha 0.05–0.09, gated above
+  y≈1600) — they are now tied to tunnels and clearly visible.
+
 ## [1.1.0] — 2026-09-01
 
 One-way enforcement, directional visual language, and a full config GUI.
@@ -67,5 +119,6 @@ First public release. Targets Minecraft 26.1.x (Fabric Loader ≥ 0.19, Fabric A
 - Full JSON config (`config/jetstreams.json`) with validation and safe defaults.
 - MIT license, README, CI workflow.
 
+[1.2.0]: https://github.com/YOUR-USERNAME/elytra-jet-streams/releases/tag/v1.2.0
 [1.1.0]: https://github.com/YOUR-USERNAME/elytra-jet-streams/releases/tag/v1.1.0
 [1.0.0]: https://github.com/YOUR-USERNAME/elytra-jet-streams/releases/tag/v1.0.0

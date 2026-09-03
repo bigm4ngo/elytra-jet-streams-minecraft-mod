@@ -18,6 +18,8 @@ public final class ModParticles {
             JetFlowOption.MAP_CODEC, JetFlowOption.STREAM_CODEC);
     /** Large, faint, flow-aligned cirrus band puff near cruise altitude. */
     public static final SimpleParticleType CIRRUS_BAND = register("cirrus_band");
+    /** Bright rim marker: big, high-contrast particle that lines tunnel walls. */
+    public static final SimpleParticleType RIM_MARKER = register("rim_marker");
 
     private ModParticles() {}
 

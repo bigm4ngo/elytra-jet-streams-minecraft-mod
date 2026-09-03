@@ -31,18 +31,52 @@ public class JetStreamsConfig {
         /** If >= 0, overrides the world seed used to generate the stream layout (reroll the sky highways). */
         public long layoutSeedOverride = -1L;
 
-        /** Stream width range in blocks (spec: 500-1000). */
-        public int streamWidthMin = 500;
-        public int streamWidthMax = 1000;
-        /** Dead zone width range in blocks (spec: 100-500). */
-        public int deadZoneMin = 100;
-        public int deadZoneMax = 500;
-        /** ALTERNATING guarantees an opposite-direction lane next to every stream; RANDOM is fully random. */
+        // ------------------------------------------------- tunnel field (3D streams)
+        /**
+         * Altitude where tunnel dimension scaling starts (the low anchor). Tunnels are
+         * smallest and densest here and grow smoothly towards {@link #tunnelScaleAltitude}.
+         */
+        public double tunnelScaleBaseAltitude = 300.0;
+        /** Altitude where tunnel dimensions stop growing (values hold at/above it). */
+        public double tunnelScaleAltitude = 6000.0;
+
+        /** Tunnel width (horizontal extent perpendicular to flow) range at the base altitude. */
+        public int tunnelWidthMin = 100;
+        public int tunnelWidthMax = 300;
+        /** Tunnel width range at/above {@link #tunnelScaleAltitude}. */
+        public int tunnelWidthMinHigh = 1000;
+        public int tunnelWidthMaxHigh = 5000;
+        /** Tunnel height (vertical extent) range at the base altitude. */
+        public int tunnelHeightMin = 100;
+        public int tunnelHeightMax = 150;
+        /** Tunnel height range at/above the scale altitude. */
+        public int tunnelHeightMinHigh = 600;
+        public int tunnelHeightMaxHigh = 2000;
+        /** Tunnel length (along flow) range at the base altitude. */
+        public int tunnelLengthMin = 500;
+        public int tunnelLengthMax = 2000;
+        /** Tunnel length range at/above the scale altitude (rare outliers can reach ~2x max). */
+        public int tunnelLengthMinHigh = 8000;
+        public int tunnelLengthMaxHigh = 14000;
+        /**
+         * Wall-to-wall neutral gap between neighboring tunnels, at the base altitude and at
+         * the scale altitude (gap-first spacing: horizontal cell = maxWidth + maxGap + slack).
+         */
+        public int tunnelGapMin = 150;
+        public int tunnelGapMax = 350;
+        public int tunnelGapMinHigh = 800;
+        public int tunnelGapMaxHigh = 1200;
+        /** Probability [0,1] that a lattice cell actually spawns a tunnel (spacing is probabilistic). */
+        public double tunnelExistenceChance = 0.7;
+        /** Bell-distribution tightness: 0 = uniform in range, higher = stronger clustering at the middle. */
+        public double tunnelDistributionTightness = 1.0;
+
+        /** ALTERNATING guarantees an opposite-direction lane next to every tunnel; RANDOM is fully random. */
         public String directionMode = "ALTERNATING";
-        /** Centerline wobble amplitude (blocks) - makes streams curve continuously. */
-        public int meanderAmplitude = 140;
-        /** Centerline wobble wavelength (blocks). */
-        public int meanderWavelength = 2400;
+        /** Max centerline wobble (blocks, scales with tunnel size) - makes tunnels curve. */
+        public double meanderFraction = 0.18;
+        /** Centerline wobble wavelength, as a multiple of the horizontal cell size. */
+        public double meanderWavelengthCells = 3.0;
 
         // ---------------------------------------------------------------- speed
         /** Altitude where jet streams activate (the k constant of the multiplier equation). */
@@ -62,6 +96,13 @@ public class JetStreamsConfig {
         public double cruiseSpeedPeak = 100.0;
         /** Per-tick approach rate toward cruise speed (0..1). */
         public double cruiseGain = 0.08;
+
+        /** Altitude where slow out-of-stream (neutral zone) cruising begins. */
+        public double neutralCruiseStartAltitude = 4000.0;
+        /** Neutral-zone cruise speed (b/s) at its start altitude (any direction, no current). */
+        public double neutralCruiseSpeedBase = 20.0;
+        /** Neutral cruise exponential rate; 0.00013 gives ~34 b/s at y=8000. */
+        public double neutralCruiseRate = 0.00013;
 
         /** Max tailwind (b/s) the stream adds to a glider below cruise altitude. */
         public double windBoostSpeed = 30.0;

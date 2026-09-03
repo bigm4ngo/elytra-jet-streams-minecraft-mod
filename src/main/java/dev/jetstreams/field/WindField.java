@@ -9,25 +9,25 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Public entry point for querying the 2D jet stream flow field.
+ * Public entry point for querying the 3D jet stream tunnel field.
  *
  * <p>Layout determinism: the server derives a "field seed" from the world seed (passed
  * through a non-reversible mix so raw world seeds never reach clients), and syncs it to
  * modded clients via the physics payload. Both sides then sample the identical field with
  * zero packets. A config {@code layoutSeedOverride} lets admins reroll a world's layout;
- * the config revision is part of the cache key so live reloads rebuild the grids.
+ * the config revision is part of the cache key so live reloads rebuild the field.
  */
 public final class WindField {
     private record GridKey(long seed, int revision) {}
 
     private static final long FIELD_SALT = 0x4A45545354524541L; // "JETSTREA"
 
-    private static final Map<GridKey, BandGrid[]> GRIDS = new ConcurrentHashMap<>();
+    private static final Map<GridKey, TunnelField> FIELDS = new ConcurrentHashMap<>();
     private static volatile int configRevision = 0;
 
     private WindField() {}
 
-    /** Called by ConfigManager on (re)load so cached grids rebuild with the new layout constants. */
+    /** Called by ConfigManager on (re)load so cached fields rebuild with the new layout constants. */
     public static void invalidate() {
         configRevision++;
     }
@@ -46,11 +46,9 @@ public final class WindField {
         return FieldRandom.mix(raw ^ FIELD_SALT);
     }
 
-    public static BandGrid[] grids(long seed, Physics p) {
-        return GRIDS.computeIfAbsent(new GridKey(seed, configRevision), key -> new BandGrid[] {
-                BandGrid.create(seed, true, p),  // NS bands: indexed by X, flow along Z
-                BandGrid.create(seed, false, p)  // EW bands: indexed by Z, flow along X
-        });
+    public static TunnelField field(long seed, Physics p) {
+        return FIELDS.computeIfAbsent(new GridKey(seed, configRevision),
+                key -> TunnelField.create(seed, p));
     }
 
     /** True when the jet stream system is active in this dimension. */
@@ -70,38 +68,31 @@ public final class WindField {
     }
 
     /**
-     * Samples the flow field at a world column.
+     * Samples the tunnel field at a world position.
      * Pure arithmetic - no chunk access, no allocation beyond the returned record,
      * safe to call from any thread.
      */
-    public static WindSample sample(Level level, double x, double z, Physics p) {
+    public static WindSample sample(Level level, double x, double y, double z, Physics p) {
         if (!enabledFor(level, p)) {
             return WindSample.EMPTY;
         }
-        BandGrid[] grids = grids(fieldSeed(level, p), p);
-        BandGrid.Sample ns = grids[0].sampleBand(x, z, p.meanderAmplitude, p.meanderWavelength);
-        BandGrid.Sample ew = grids[1].sampleBand(z, x, p.meanderAmplitude, p.meanderWavelength);
-        long nsBand = grids[0].cell(grids[0].indexAt(x)).index();
-        long ewBand = grids[1].cell(grids[1].indexAt(z)).index();
-        RegionType region;
-        if (ns.inStream() && ew.inStream()) {
-            region = RegionType.CROSSING;
-        } else if (ns.inStream()) {
-            region = RegionType.NS_STREAM;
-        } else if (ew.inStream()) {
-            region = RegionType.EW_STREAM;
-        } else {
-            region = RegionType.DEAD_ZONE;
-        }
-        return new WindSample(
-                ns.inStream(), ns.profile(), ns.flowX(), ns.flowZ(), nsBand,
-                ew.inStream(), ew.profile(), ew.flowX(), ew.flowZ(), ewBand,
-                region);
+        return field(fieldSeed(level, p), p).sample(x, y, z);
     }
 
     /** Convenience overload using the active (possibly synced) physics config. */
-    public static WindSample sample(Level level, double x, double z) {
-        return sample(level, x, z, dev.jetstreams.physics.PhysicsResolver.activeFor(level));
+    public static WindSample sample(Level level, double x, double y, double z) {
+        return sample(level, x, y, z, dev.jetstreams.physics.PhysicsResolver.activeFor(level));
+    }
+
+    /**
+     * FX helper: the strongest tunnel at a position (may be null in neutral air). Used by
+     * the client particle system for rim-wall markers and in-tunnel cirrus bands.
+     */
+    public static TunnelField.Hit tunnelHit(Level level, double x, double y, double z, Physics p) {
+        if (!enabledFor(level, p)) {
+            return null;
+        }
+        return field(fieldSeed(level, p), p).best(x, y, z);
     }
 
     // ------------------------------------------------------------- speed curves
@@ -130,6 +121,21 @@ public final class WindField {
         double rate = Math.log(p.cruiseSpeedPeak / p.cruiseSpeedBase)
                 / (p.speedCapAltitude - p.cruiseStartAltitude);
         return p.cruiseSpeedBase * Math.exp(rate * (yEff - p.cruiseStartAltitude));
+    }
+
+    /**
+     * Out-of-stream (neutral zone) cruise speed: starts at {@code neutralCruiseSpeedBase}
+     * at {@code neutralCruiseStartAltitude} (default 20 b/s at y=4000) and grows slowly and
+     * exponentially (~34 b/s at y=8000 with the default rate of 0.00013) - much slower than
+     * in-tunnel cruise, and available in any direction because neutral air has no current.
+     */
+    public static double neutralCruiseSpeed(Physics p, double y) {
+        if (y < p.neutralCruiseStartAltitude) {
+            return 0.0;
+        }
+        double yEff = Math.min(y, p.speedCapAltitude);
+        return p.neutralCruiseSpeedBase
+                * Math.exp(p.neutralCruiseRate * (yEff - p.neutralCruiseStartAltitude));
     }
 
     /**

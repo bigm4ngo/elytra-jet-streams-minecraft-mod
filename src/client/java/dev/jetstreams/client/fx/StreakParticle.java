@@ -66,12 +66,36 @@ public class StreakParticle extends SingleQuadParticle {
         public Particle createParticle(JetFlowOption type, ClientLevel level,
                                        double x, double y, double z,
                                        double vx, double vy, double vz, RandomSource random) {
-            int lifetime = 22 + random.nextInt(20);
-            float size = 0.14F + random.nextFloat() * 0.18F;
-            float alpha = 0.16F + random.nextFloat() * 0.10F;
+            int lifetime = 24 + random.nextInt(20);
+            float size = 0.26F + random.nextFloat() * 0.20F;
+            float alpha = 0.30F + random.nextFloat() * 0.14F;
             int color = TintPalette.forDirection(type.direction());
             return new StreakParticle(level, x, y, z, vx, vy, vz, this.sprites,
                     lifetime, size, alpha, color);
+        }
+    }
+
+    /**
+     * Bigger, brighter sibling used for tunnel <b>rim markers</b> - the wall lining that
+     * makes stream borders unmistakable. Spawned white for maximum contrast against the
+     * tinted flow streaks: the rim reads "wall", the color inside reads "which current".
+     */
+    public static class RimProvider implements ParticleProvider<net.minecraft.core.particles.SimpleParticleType> {
+        private final SpriteSet sprites;
+
+        public RimProvider(SpriteSet sprites) {
+            this.sprites = sprites;
+        }
+
+        @Override
+        public Particle createParticle(net.minecraft.core.particles.SimpleParticleType type, ClientLevel level,
+                                       double x, double y, double z,
+                                       double vx, double vy, double vz, RandomSource random) {
+            int lifetime = 18 + random.nextInt(14);
+            float size = 0.40F + random.nextFloat() * 0.30F;
+            float alpha = 0.55F + random.nextFloat() * 0.25F;
+            return new StreakParticle(level, x, y, z, vx, vy, vz, this.sprites,
+                    lifetime, size, alpha, 0xFFFFFF);
         }
     }
 }

@@ -63,9 +63,9 @@ public class CirrusParticle extends SingleQuadParticle {
         public Particle createParticle(SimpleParticleType type, ClientLevel level,
                                        double x, double y, double z,
                                        double vx, double vy, double vz, RandomSource random) {
-            int lifetime = 400 + random.nextInt(400);
-            float size = 14.0F + random.nextFloat() * 18.0F;
-            float alpha = 0.05F + random.nextFloat() * 0.04F;
+            int lifetime = 500 + random.nextInt(400);
+            float size = 24.0F + random.nextFloat() * 22.0F;
+            float alpha = 0.10F + random.nextFloat() * 0.07F;
             return new CirrusParticle(level, x, y, z, vx, vy, vz, this.sprites, lifetime, size, alpha);
         }
     }
