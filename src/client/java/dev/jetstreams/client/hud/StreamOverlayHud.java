@@ -27,6 +27,15 @@ public final class StreamOverlayHud {
         HudElementRegistry.addLast(dev.jetstreams.JetStreams.id("stream_overlay"), StreamOverlayHud::extract);
     }
 
+    private static boolean tintEnabled(dev.jetstreams.config.JetStreamsConfig.Client c, int flowDir) {
+        return switch (flowDir) {
+            case dev.jetstreams.registry.JetFlowOption.NORTH -> c.tintNorthEnabled;
+            case dev.jetstreams.registry.JetFlowOption.SOUTH -> c.tintSouthEnabled;
+            case dev.jetstreams.registry.JetFlowOption.EAST -> c.tintEastEnabled;
+            default -> c.tintWestEnabled;
+        };
+    }
+
     private static void extract(GuiGraphicsExtractor gui, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
@@ -48,13 +57,14 @@ public final class StreamOverlayHud {
         // ---------------------------------------------- directional / neutral tint
         if (c.streamTints) {
             double strength = Math.max(0.0, Math.min(2.0, c.tintStrength));
-            if (st.inStream && st.windProfile > 0.05 && st.flowDir >= 0) {
+            if (st.inStream && st.windProfile > 0.05 && st.flowDir >= 0
+                    && tintEnabled(c, st.flowDir)) {
                 int rgb = TintPalette.forDirection(st.flowDir);
                 int alpha = (int) Math.min(90.0, 62.0 * strength * Math.min(1.0, st.windProfile));
                 if (alpha > 0) {
                     gui.fill(0, 0, w, h, (alpha << 24) | rgb);
                 }
-            } else if (!st.inStream) {
+            } else if (!st.inStream && c.tintNeutralEnabled) {
                 int rgb = TintPalette.neutral();
                 int alpha = (int) Math.min(40.0, 24.0 * strength);
                 if (alpha > 0) {

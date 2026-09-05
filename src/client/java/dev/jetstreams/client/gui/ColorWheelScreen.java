@@ -1,23 +1,24 @@
 package dev.jetstreams.client.gui;
 
+import dev.jetstreams.client.TintPalette;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 
 import java.util.Locale;
-import java.util.function.DoubleConsumer;
 import java.util.function.IntConsumer;
 
 /**
- * Full-screen HSV colour editor for one tint slot: wheel (hue + saturation), brightness
- * slider, live preview swatch and hex readout. Changes apply live to the target config
- * field; Cancel restores the colour the editor was opened with.
+ * Full-screen HSV colour editor for one tint slot with <b>both</b> input methods: the
+ * colour wheel (hue + saturation by click/drag) and a hex text field (#RRGGBB). A
+ * brightness slider and a live preview swatch complete the editor. Changes apply live to
+ * the target config field; Cancel restores the colour the editor was opened with.
  */
 public class ColorWheelScreen extends Screen {
-    private static final int WHEEL = 120;
+    private static final int WHEEL = 96; // matches the generated wheel texture 1:1
 
     private final Screen parent;
     private final String title;
@@ -25,7 +26,9 @@ public class ColorWheelScreen extends Screen {
     private final int originalRgb;
 
     private ColorWheelWidget wheel;
+    private EditBox hexField;
     private float value = 1.0F;
+    private boolean updatingHex;
 
     public ColorWheelScreen(Screen parent, String title, int rgb, IntConsumer target) {
         super(Component.literal("Edit colour - " + title));
@@ -68,11 +71,11 @@ public class ColorWheelScreen extends Screen {
         int w = this.width;
         int cx = w / 2 - WHEEL / 2;
         float[] hsv = rgbToHsv(currentColor());
-        this.wheel = new ColorWheelWidget(cx, 44, WHEEL, hsv[0], hsv[1]);
+        this.wheel = new ColorWheelWidget(cx, 34, WHEEL, hsv[0], hsv[1]);
         this.addRenderableWidget(this.wheel);
 
         this.addRenderableWidget(new AbstractSliderButton(
-                cx, 44 + WHEEL + 12, WHEEL, 18,
+                w / 2 - 100, 34 + WHEEL + 8, 200, 18,
                 Component.literal(brightnessLabel()), value) {
             @Override
             protected void updateMessage() {
@@ -83,19 +86,43 @@ public class ColorWheelScreen extends Screen {
             protected void applyValue() {
                 value = (float) this.value;
                 apply();
+                syncHexField();
             }
         });
         this.addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
-                .bounds(w / 2 - 100, this.height - 30, 98, 20).build());
+                .bounds(w / 2 - 100, this.height - 26, 98, 20).build());
         this.addRenderableWidget(Button.builder(Component.literal("Cancel"), b -> {
             this.target.accept(originalRgb);
             this.minecraft.setScreen(parent);
-        }).bounds(w / 2 + 2, this.height - 30, 98, 20).build());
+        }).bounds(w / 2 + 2, this.height - 26, 98, 20).build());
+
+        // Hex paste field: type or paste "#RRGGBB" and the wheel/preview follow.
+        int fieldY = 34 + WHEEL + 30;
+        this.hexField = new EditBox(this.font, w / 2 - 62, fieldY, 104, 16,
+                Component.literal("Hex colour"));
+        this.hexField.setMaxLength(7);
+        this.hexField.setValue(String.format(Locale.ROOT, "#%06X", currentColor() & 0xFFFFFF));
+        this.hexField.setResponder(text -> {
+            Integer parsed = TintPalette.tryParseHex(text);
+            if (parsed != null && !updatingHex) {
+                float[] parsedHsv = rgbToHsv(parsed);
+                this.value = parsedHsv[2];
+                this.wheel.setHsv(parsedHsv[0], parsedHsv[1]);
+                apply();
+            }
+            this.updatingHex = false;
+        });
+        this.addRenderableWidget(this.hexField);
 
         this.addRenderableOnly(new LabelWidget(0, 12, w, 14, Component.literal(this.title)));
-        this.addRenderableOnly(new LabelWidget(0, 44 + WHEEL + 34, w, 12,
-                Component.literal("Click or drag inside the wheel to pick hue + saturation")));
+        this.addRenderableOnly(new LabelWidget(0, fieldY + 20, w, 12,
+                Component.literal("Click or drag the wheel for hue + saturation, or type a hex code")));
+        this.swatchX = w / 2 + 50;
+        this.swatchY = fieldY;
     }
+
+    private int swatchX;
+    private int swatchY;
 
     private String brightnessLabel() {
         return String.format(Locale.ROOT, "Brightness: %d%%", (int) (value * 100));
@@ -109,17 +136,23 @@ public class ColorWheelScreen extends Screen {
         this.target.accept(currentColor());
     }
 
+    /** Mirrors the live colour into the hex field unless the user is editing it. */
+    private void syncHexField() {
+        if (hexField != null && !hexField.isFocused()) {
+            String next = String.format(Locale.ROOT, "#%06X", currentColor() & 0xFFFFFF);
+            if (!next.equalsIgnoreCase(hexField.getValue())) {
+                updatingHex = true;
+                hexField.setValue(next);
+            }
+        }
+    }
+
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
         super.extractRenderState(graphics, mouseX, mouseY, a);
         int rgb = currentColor();
-        int size = 34;
-        int x = this.width / 2 - size / 2;
-        int y = 44 + WHEEL + 52;
-        graphics.fill(x, y, x + size, y + size, 0xFF000000 | rgb);
-        graphics.outline(x - 1, y - 1, size + 2, size + 2, 0xFFFFFFFF);
-        graphics.text(this.font, String.format(Locale.ROOT, "#%06X", rgb & 0xFFFFFF),
-                x + size + 8, y + size / 2 - 4, 0xFFFFFFFF, true);
+        graphics.fill(swatchX, swatchY, swatchX + 16, swatchY + 16, 0xFF000000 | rgb);
+        graphics.outline(swatchX - 1, swatchY - 1, 18, 18, 0xFFFFFFFF);
     }
 
     @Override

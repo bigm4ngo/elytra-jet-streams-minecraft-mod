@@ -67,7 +67,7 @@ public class JetStreamsConfig {
         public int tunnelGapMinHigh = 800;
         public int tunnelGapMaxHigh = 1200;
         /** Probability [0,1] that a lattice cell actually spawns a tunnel (spacing is probabilistic). */
-        public double tunnelExistenceChance = 0.7;
+        public double tunnelExistenceChance = 0.8;
         /** Bell-distribution tightness: 0 = uniform in range, higher = stronger clustering at the middle. */
         public double tunnelDistributionTightness = 1.0;
 
@@ -181,5 +181,11 @@ public class JetStreamsConfig {
         public String tintEast = "#59E0A0";
         public String tintWest = "#C77DFF";
         public String tintNeutral = "#8C99A8";
+        /** Per-direction tint switches (screen tint per flow direction, incl. neutral). */
+        public boolean tintNorthEnabled = true;
+        public boolean tintSouthEnabled = true;
+        public boolean tintEastEnabled = true;
+        public boolean tintWestEnabled = true;
+        public boolean tintNeutralEnabled = true;
     }
 }

@@ -15,7 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Locale;
 
-/** {@code /jetstreams info} and {@code /jetstreams reload}. */
+/** {@code /jetstreams info|locate|reload}. */
 public final class JetStreamsCommand {
     private JetStreamsCommand() {}
 
@@ -30,6 +30,17 @@ public final class JetStreamsCommand {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     return info(player);
                 }))
+                .then(Commands.literal("locate")
+                        .requires(src -> src.permissions().hasPermission(
+                                net.minecraft.server.permissions.Permissions.COMMANDS_MODERATOR))
+                        .then(Commands.literal("north").executes(ctx ->
+                                locate(ctx.getSource(), dev.jetstreams.registry.JetFlowOption.NORTH)))
+                        .then(Commands.literal("south").executes(ctx ->
+                                locate(ctx.getSource(), dev.jetstreams.registry.JetFlowOption.SOUTH)))
+                        .then(Commands.literal("east").executes(ctx ->
+                                locate(ctx.getSource(), dev.jetstreams.registry.JetFlowOption.EAST)))
+                        .then(Commands.literal("west").executes(ctx ->
+                                locate(ctx.getSource(), dev.jetstreams.registry.JetFlowOption.WEST))))
                 .then(Commands.literal("reload")
                         .requires(src -> src.permissions().hasPermission(
                                 net.minecraft.server.permissions.Permissions.COMMANDS_MODERATOR))
@@ -42,6 +53,52 @@ public final class JetStreamsCommand {
                             return 1;
                         }))
         );
+    }
+
+    /**
+     * Finds the nearest point inside a stream flowing toward the requested cardinal
+     * direction and reports it (with a click-to-teleport suggestion).
+     */
+    private static int locate(CommandSourceStack source, int flowDir)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        var level = player.level();
+        var p = PhysicsResolver.activeFor(level);
+        int family = flowDir == dev.jetstreams.registry.JetFlowOption.EAST
+                || flowDir == dev.jetstreams.registry.JetFlowOption.WEST ? 1 : 0;
+        int sign = flowDir == dev.jetstreams.registry.JetFlowOption.SOUTH
+                || flowDir == dev.jetstreams.registry.JetFlowOption.EAST ? 1 : -1;
+        String dirName = switch (flowDir) {
+            case dev.jetstreams.registry.JetFlowOption.NORTH -> "northbound";
+            case dev.jetstreams.registry.JetFlowOption.SOUTH -> "southbound";
+            case dev.jetstreams.registry.JetFlowOption.EAST -> "eastbound";
+            default -> "westbound";
+        };
+        String dirArrow = switch (flowDir) {
+            case dev.jetstreams.registry.JetFlowOption.NORTH -> "(-Z)";
+            case dev.jetstreams.registry.JetFlowOption.SOUTH -> "(+Z)";
+            case dev.jetstreams.registry.JetFlowOption.EAST -> "(+X)";
+            default -> "(-X)";
+        };
+
+        var field = WindField.field(WindField.fieldSeed(level, p), p);
+        var hit = field.locateNearest(player.getX(), player.getY(), player.getZ(), family, sign, 24);
+        if (hit == null) {
+            source.sendFailure(Component.literal(
+                    "§cNo " + dirName + " stream found in range (that is extremely unlikely - "
+                            + "check the tunnel config)."));
+            return 0;
+        }
+        String tp = String.format(Locale.ROOT, "/tp @s %.0f %.0f %.0f", hit.x(), hit.y(), hit.z());
+        net.minecraft.network.chat.MutableComponent msg = Component.literal(String.format(Locale.ROOT,
+                        "§bNearest %s stream %s: §fX=%.0f  Y=%.0f  Z=%.0f §7(%.0f blocks away, "
+                                + "%d wide, %d tall, %d long) ",
+                        dirName, dirArrow, hit.x(), hit.y(), hit.z(), hit.distance(),
+                        (int) (hit.halfW() * 2), (int) (hit.halfH() * 2), (int) (hit.halfL() * 2)))
+                .withStyle(style -> style.withClickEvent(
+                        new net.minecraft.network.chat.ClickEvent.SuggestCommand(tp)));
+        source.sendSuccess(() -> msg.append(Component.literal("§9§n[Teleport]")), false);
+        return 1;
     }
 
     private static int info(ServerPlayer player) {

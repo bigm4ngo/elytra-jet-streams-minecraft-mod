@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] — 2026-09-06
+
+Discoverability release: streams were far rarer in practice than designed (the lattice
+was sized by maximum tunnel dimensions while tunnels average their midpoints), plus a
+locate command and a reworked colour editor.
+
+### Added
+- **`/jetstreams locate <north|south|east|west>`** (operator only): finds the nearest
+  point **inside** a stream flowing toward the requested cardinal direction — not
+  necessarily the tunnel mouth. Prints coordinates, straight-line distance and tunnel
+  dimensions, with a click-to-suggest teleport command.
+- **Per-direction tint switches**: five new client toggles (`tintNorthEnabled`,
+  `tintSouthEnabled`, `tintEastEnabled`, `tintWestEnabled`, `tintNeutralEnabled`, all
+  default on) let you keep some directions tinted and others plain. The ModMenu colour
+  section gained a row of on/off switches under the colour buttons; a direction's
+  swatch dims while its tint is off.
+- **Hex colour input**: the colour editor now takes both input methods — pick on the
+  wheel *or* type/paste a `#RRGGBB` code into the new hex field; both update the wheel,
+  brightness slider and preview live.
+
+### Fixed
+- **Streams are actually findable now** — the big one. The tunnel lattice was spaced by
+  *maximum* tunnel dimensions, but tunnels *average* their midpoint sizes, so the real
+  air coverage was ~4× below design (measured 2–12% of flight paths in wind; vertical
+  dead bands at mid altitudes were nearly stream-free). Slab spacing now tracks the mean
+  tunnel height, cell/period spacing uses the mean gap/length, and the default
+  existence chance rose 0.7 → 0.8. Measured in-stream coverage at y=350…6500 is now
+  10–27% of flight paths (perpendicular encounters every few hundred to ~2000 blocks).
+- **Colour wheel glitch**: the wheel was drawn with a blit whose implicit source size
+  equalled the destination size, wrapping the UVs past the texture edge — the "misplaced
+  wheel / parts of two other wheels" artifact. The wheel is now blitted 1:1 with explicit
+  source rect.
+- **ModMenu layout**: the colour buttons could overlap the settings above them and the
+  Done button at small GUI scales. The colour block is now bottom-anchored and compact;
+  nothing overlaps at any height.
+
+### Changed
+- Rim approach markers now probe up to **320 blocks ahead** along your heading (was 40),
+  so tunnel mouths advertise themselves much earlier.
+- Tunnel fat tail capped at ×1.6 (matching the segment period) and tunnel centers are
+  clamped into their segment, keeping the O(1) sampling invariant airtight.
+
 ## [1.2.0] — 2026-09-01
 
 The 3D tunnel revamp: streams become finite elliptical **tubes** in a calm sky, plus a

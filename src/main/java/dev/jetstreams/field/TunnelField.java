@@ -135,6 +135,12 @@ public final class TunnelField {
         return lerpDim(y, p, p.tunnelHeightMax, p.tunnelHeightMaxHigh);
     }
 
+    /** The height a typical tunnel actually has at this altitude (bell midpoint). */
+    private static double meanTunnelHeightAt(Physics p, double y) {
+        return 0.5 * (lerpDim(y, p, p.tunnelHeightMin, p.tunnelHeightMinHigh)
+                + lerpDim(y, p, p.tunnelHeightMax, p.tunnelHeightMaxHigh));
+    }
+
     private static double midGapAt(Physics p, double y) {
         double low = (p.tunnelGapMin + p.tunnelGapMax) / 2.0;
         double high = (p.tunnelGapMinHigh + p.tunnelGapMaxHigh) / 2.0;
@@ -150,29 +156,129 @@ public final class TunnelField {
     }
 
     /**
-     * Vertical slab spacing: max tunnel height + a HALF-strength gap. Vertical packing is
-     * intentionally denser than horizontal: near the base altitude the tunnel columns
-     * should nearly tile the sky, so flying at any y actually encounters tunnels.
+     * Vertical slab spacing: the MEAN tunnel height (what tunnels actually are - sizing by
+     * the max would squeeze every tunnel toward its slab's middle and leave huge dead bands
+     * at the seams) plus a compressed vertical gap. Taller-than-slab outliers are simply
+     * centered in their slab by the clamp below.
      */
     private static double slabThickness(double y, Physics p) {
-        return maxTunnelHeightAt(p, y) + 0.5 * midGapAt(p, y);
+        return meanTunnelHeightAt(p, y) + 0.35 * midGapAt(p, y);
     }
 
-    /** Horizontal cell size: max width + max gap + in-cell slack (gap-first spacing). */
+    /**
+     * Horizontal cell size: max width + the MEAN gap + in-cell slack. Sizing by the mean
+     * gap (not the max) keeps tunnels at the density the gap config promises while the
+     * center clamp still guarantees at least {@code gapMin} of neutral air between
+     * neighbors (the meander cap absorbs the gapMax - gapMin spread).
+     */
     private static double cellSize(double y, Physics p) {
         double wMax = lerpDim(y, p, p.tunnelWidthMax, p.tunnelWidthMaxHigh);
-        double gMax = lerpDim(y, p, p.tunnelGapMax, p.tunnelGapMaxHigh);
-        return wMax + gMax + 2.0 * IN_CELL_MARGIN;
+        double gMid = midGapAt(p, y);
+        return wMax + gMid + 2.0 * IN_CELL_MARGIN;
     }
 
-    /** Along-flow segment period: long enough that any tunnel fits inside one segment. */
+    /**
+     * Along-flow segment period: sized so the fat-tailed maximum length
+     * (1.6 &times; max) still fits inside one segment, keeping the one-segment
+     * lookup invariant while roughly halving the average along-flow dead stretch.
+     */
     private static double segmentPeriod(double y, Physics p) {
         double lMax = lerpDim(y, p, p.tunnelLengthMax, p.tunnelLengthMaxHigh);
-        return 2.0 * lMax;
+        return 1.6 * lMax;
     }
 
     /** Per-family result: the hit (nullable) plus the lattice slot id of the candidate. */
     private record FamilyHit(Hit hit, long slot) {}
+
+    // ------------------------------------------------------------- stream locator
+
+    /**
+     * Nearest point inside a stream flowing in the requested direction: the tunnel axis
+     * position closest to the player (clamped into the tunnel's tapered body), not
+     * necessarily the tunnel's mouth.
+     */
+    public record LocateResult(double x, double y, double z, double distance,
+                               double halfW, double halfH, double halfL, int family) {}
+
+    /**
+     * Finds the nearest in-stream point of any tunnel flowing with the given family/sign.
+     * Expands outward over the (cell, segment) lattice rings and slab neighbors until a
+     * provably-nearest match is found (or {@code maxRings} is exhausted).
+     */
+    public LocateResult locateNearest(double px, double py, double pz, int family, int sign, int maxRings) {
+        long slab0 = slabIndexAt(Math.max(py, p.tunnelScaleBaseAltitude + 1.0));
+        LocateResult best = null;
+        for (int sd = 0; sd <= 3 && sd <= maxRings; sd++) {
+            int sides = sd == 0 ? 1 : 2;
+            for (int s = 0; s < sides; s++) {
+                long slab = slab0 + (sd == 0 ? 0 : (s == 0 ? sd : -sd));
+                if (slab < 0) {
+                    continue;
+                }
+                best = searchSlab(best, slab, px, py, pz, family, sign, maxRings);
+            }
+        }
+        return best;
+    }
+
+    /** Ring search over one slab's lattice; keeps the better of {@code best} and new hits. */
+    private LocateResult searchSlab(LocateResult best, long slab,
+                                    double px, double py, double pz,
+                                    int family, int sign, int maxRings) {
+        double yBase = slabs.boundary(slab, p);
+        double yTop = slabs.boundary(slab + 1, p);
+        double midY = 0.5 * (yBase + yTop);
+        double cell = cellSize(midY, p);
+        double period = segmentPeriod(midY, p);
+        long salt = family == 0 ? SALT_NS : SALT_EW;
+        double playerPerp = family == 0 ? px : pz;
+        double playerAlong = family == 0 ? pz : px;
+        long pc = (long) Math.floor(playerPerp / cell);
+        long ps = (long) Math.floor(playerAlong / period);
+        double baseFloor = p.tunnelScaleBaseAltitude + 2.0;
+
+        for (int r = 0; r <= maxRings; r++) {
+            for (long dc = -r; dc <= r; dc++) {
+                for (long ds = -r; ds <= r; ds++) {
+                    if (Math.max(Math.abs(dc), Math.abs(ds)) != r) {
+                        continue; // ring sweep only
+                    }
+                    long slot = mixSlot(family, slab, pc + dc, ps + ds);
+                    Tunnel t = tunnelFor(family, salt, slab, slot, pc + dc, ps + ds, midY);
+                    if (t == null || t.sign() != sign) {
+                        continue;
+                    }
+                    // Nearest on-axis point inside the tapered body (90% of half-length
+                    // keeps the end-fade at full strength, so the point is really in wind).
+                    double along = Mth.clamp(playerAlong,
+                            t.centerAlong() - t.halfL() * 0.9, t.centerAlong() + t.halfL() * 0.9);
+                    double wobble = t.amp() * Math.sin(
+                            2.0 * Math.PI * (along - t.centerAlong()) / t.lambda() + t.phase());
+                    double perp = t.centerPerp() + wobble;
+                    double py2 = Math.max(t.yCenter(), baseFloor);
+                    if (Math.abs(py2 - t.yCenter()) > t.halfH() * 0.95) {
+                        continue; // core lies below the activation line
+                    }
+                    double dx = (family == 0 ? perp : along) - px;
+                    double dz = (family == 0 ? along : perp) - pz;
+                    double dy = py2 - py;
+                    double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (best == null || dist < best.distance()) {
+                        double x = family == 0 ? perp : along;
+                        double z = family == 0 ? along : perp;
+                        best = new LocateResult(x, py2, z, dist,
+                                t.halfW(), t.halfH(), t.halfL(), family);
+                    }
+                }
+            }
+            // Any slot in a later ring is at least r * min(cell, period) away in either
+            // the perpendicular or the along-flow axis, so this hit is provably nearest.
+            if (best != null && best.distance() < r * Math.min(cell, period)) {
+                break;
+            }
+        }
+        return best;
+    }
 
     // ------------------------------------------------------------------ sampling
 
@@ -306,9 +412,11 @@ public final class TunnelField {
         double width = bell(seed, salt, slot * 7 + 1, wMin, wMax, tight);
         double height = bell(seed, salt, slot * 7 + 2, hMin, hMax, tight);
         double length = bell(seed, salt, slot * 7 + 3, lMin, lMax, tight);
-        // Fat tail: rare monsters up to ~2x the max range up high.
+        // Fat tail: rare monsters, up to 1.6x the max range up high (20k+ blocks) -
+        // exactly the factor the segment period is sized for so tunnels never
+        // straddle a segment boundary.
         if (FieldRandom.hash01(seed, salt, slot * 7 + 4) < 0.12) {
-            length *= 1.0 + FieldRandom.hash01(seed, salt, slot * 7 + 5) * 1.0;
+            length *= 1.0 + FieldRandom.hash01(seed, salt, slot * 7 + 5) * 0.6;
         }
 
         double cell = cellSize(midY, p);
@@ -346,6 +454,9 @@ public final class TunnelField {
         double centerAlong = segStart + marginAlong
                 + FieldRandom.hash01(seed, salt, slot * 7 + 8)
                         * Math.max(0.0, period - 2.0 * marginAlong);
+        // Keep fat-tailed monsters fully inside their segment (their length can meet the
+        // period), preserving the one-segment lookup invariant.
+        centerAlong = Mth.clamp(centerAlong, segStart + length / 2.0 + 2.0, segEnd - length / 2.0 - 2.0);
 
         // Vertical center clamped into the slab (tunnels never cross slab boundaries);
         // only a thin margin here - vertical packing is deliberately denser than horizontal.

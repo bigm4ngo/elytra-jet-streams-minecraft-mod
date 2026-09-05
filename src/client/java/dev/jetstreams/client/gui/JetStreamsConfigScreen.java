@@ -2,8 +2,10 @@ package dev.jetstreams.client.gui;
 
 import dev.jetstreams.client.TintPalette;
 import dev.jetstreams.config.ConfigManager;
-import dev.jetstreams.registry.JetFlowOption;
+import dev.jetstreams.config.JetStreamsConfig;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
@@ -17,9 +19,13 @@ import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
 /**
- * ModMenu config screen - <b>visuals only</b> (v1.2.0). Every control here is client-local
- * and editable by anyone; physics settings live exclusively in the config file
- * (operator territory, applied via {@code /jetstreams reload}).
+ * ModMenu config screen - <b>visuals only</b>. Every control here is client-local and
+ * editable by anyone; physics settings live exclusively in the config file (operator
+ * territory, applied via {@code /jetstreams reload}).
+ *
+ * <p>Layout is deliberately non-overlapping: fixed rows for toggles/sliders up top, and a
+ * bottom-anchored colour block (colour buttons + per-direction tint switches) above the
+ * Done button, so it never covers another setting at any GUI scale.
  */
 public class JetStreamsConfigScreen extends Screen {
     private final Screen parent;
@@ -41,40 +47,61 @@ public class JetStreamsConfigScreen extends Screen {
         this.addRenderableOnly(new LabelWidget(0, 12, w, 14, this.title));
 
         var c = ConfigManager.get().client;
-        this.addRenderableWidget(toggle(x0, 56, colW, "Directional particles",
+        // Left column: behaviour toggles. Right column: strength sliders.
+        this.addRenderableWidget(toggle(x0, 36, colW, "Directional particles",
                 () -> c.directionParticles, v -> c.directionParticles = v));
-        this.addRenderableWidget(toggle(x0, 80, colW, "Stream tints",
+        this.addRenderableWidget(toggle(x0, 58, colW, "Stream tints",
                 () -> c.streamTints, v -> c.streamTints = v));
-        this.addRenderableWidget(toggle(x0, 104, colW, "Headwind edge tint",
+        this.addRenderableWidget(toggle(x0, 80, colW, "Headwind edge tint",
                 () -> c.headwindIndicator, v -> c.headwindIndicator = v));
-        this.addRenderableWidget(toggle(x0, 128, colW, "Sky darkening",
+        this.addRenderableWidget(toggle(x0, 102, colW, "Sky darkening",
                 () -> c.skyTint, v -> c.skyTint = v));
-        this.addRenderableWidget(toggle(x0, 152, colW, "Cirrus cloud bands",
+        this.addRenderableWidget(toggle(x0, 124, colW, "Cirrus cloud bands",
                 () -> c.cirrusBands, v -> c.cirrusBands = v));
 
-        this.addRenderableWidget(slider(x1, 56, colW, "Particle density", 0.0, 6.0, 0.1,
+        this.addRenderableWidget(slider(x1, 36, colW, "Particle density", 0.0, 6.0, 0.1,
                 () -> c.particleDensity, v -> c.particleDensity = v, JetStreamsConfigScreen::fmt1));
-        this.addRenderableWidget(slider(x1, 80, colW, "Tint strength", 0.0, 2.0, 0.05,
+        this.addRenderableWidget(slider(x1, 58, colW, "Tint strength", 0.0, 2.0, 0.05,
                 () -> c.tintStrength, v -> c.tintStrength = v, JetStreamsConfigScreen::fmt2));
-        this.addRenderableWidget(slider(x1, 104, colW, "Sky tint strength", 0.0, 2.0, 0.05,
+        this.addRenderableWidget(slider(x1, 80, colW, "Sky tint strength", 0.0, 2.0, 0.05,
                 () -> c.skyTintStrength, v -> c.skyTintStrength = v, JetStreamsConfigScreen::fmt2));
 
-        // Colour editors: one button per tint slot, opening the HSV colour wheel.
-        int cy = Math.min(200, h - 80);
-        int bw = Math.max(64, (w - 20 - 4 * 4) / 5);
-        this.addRenderableOnly(new LabelWidget(0, cy - 16, w, 12,
-                Component.literal("Tint colours - click to open the colour wheel")));
-        this.addRenderableWidget(colorButton(10, cy, bw, "N", () -> c.tintNorth, v -> c.tintNorth = v));
-        this.addRenderableWidget(colorButton(10 + (bw + 4), cy, bw, "S", () -> c.tintSouth, v -> c.tintSouth = v));
-        this.addRenderableWidget(colorButton(10 + (bw + 4) * 2, cy, bw, "E", () -> c.tintEast, v -> c.tintEast = v));
-        this.addRenderableWidget(colorButton(10 + (bw + 4) * 3, cy, bw, "W", () -> c.tintWest, v -> c.tintWest = v));
-        this.addRenderableWidget(colorButton(10 + (bw + 4) * 4, cy, bw, "Neutral", () -> c.tintNeutral, v -> c.tintNeutral = v));
+        // Bottom-anchored colour block: never overlaps the rows above or the Done button.
+        int bw = Math.max(56, (w - 20 - 4 * 4) / 5);
+        int colourToggleY = Math.min(186, h - 42);
+        int colourBtnY = colourToggleY - 20;
+        int colourLabelY = colourBtnY - 15;
+
+        this.addRenderableOnly(new LabelWidget(0, colourLabelY, w, 12,
+                Component.literal("Tint colours - click a button to edit (colour wheel + hex code)")));
+        this.addRenderableWidget(colorButton(10, colourBtnY, bw, "N",
+                () -> c.tintNorth, v -> c.tintNorth = v, () -> c.tintNorthEnabled));
+        this.addRenderableWidget(colorButton(10 + (bw + 4), colourBtnY, bw, "S",
+                () -> c.tintSouth, v -> c.tintSouth = v, () -> c.tintSouthEnabled));
+        this.addRenderableWidget(colorButton(10 + (bw + 4) * 2, colourBtnY, bw, "E",
+                () -> c.tintEast, v -> c.tintEast = v, () -> c.tintEastEnabled));
+        this.addRenderableWidget(colorButton(10 + (bw + 4) * 3, colourBtnY, bw, "W",
+                () -> c.tintWest, v -> c.tintWest = v, () -> c.tintWestEnabled));
+        this.addRenderableWidget(colorButton(10 + (bw + 4) * 4, colourBtnY, bw, "Neutral",
+                () -> c.tintNeutral, v -> c.tintNeutral = v, () -> c.tintNeutralEnabled));
+
+        // Per-direction tint switches (screen tint for each flow direction + neutral).
+        this.addRenderableWidget(tintSwitch(10, colourToggleY, bw, "N",
+                () -> c.tintNorthEnabled, v -> c.tintNorthEnabled = v));
+        this.addRenderableWidget(tintSwitch(10 + (bw + 4), colourToggleY, bw, "S",
+                () -> c.tintSouthEnabled, v -> c.tintSouthEnabled = v));
+        this.addRenderableWidget(tintSwitch(10 + (bw + 4) * 2, colourToggleY, bw, "E",
+                () -> c.tintEastEnabled, v -> c.tintEastEnabled = v));
+        this.addRenderableWidget(tintSwitch(10 + (bw + 4) * 3, colourToggleY, bw, "W",
+                () -> c.tintWestEnabled, v -> c.tintWestEnabled = v));
+        this.addRenderableWidget(tintSwitch(10 + (bw + 4) * 4, colourToggleY, bw, "Neutral",
+                () -> c.tintNeutralEnabled, v -> c.tintNeutralEnabled = v));
 
         this.addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
-                .bounds(w - 70, h - 28, 60, 20).build());
-        this.addRenderableOnly(new LabelWidget(0, h - 24, w, 12,
+                .bounds(w - 70, h - 26, 60, 20).build());
+        this.addRenderableOnly(new LabelWidget(0, colourToggleY + 20, w, 12,
                 Component.literal(this.status.isEmpty()
-                        ? "§7Visual settings apply instantly and stay on this client."
+                        ? "§7Switches under the colours enable/disable each direction's tint."
                         : this.status)));
     }
 
@@ -82,6 +109,52 @@ public class JetStreamsConfigScreen extends Screen {
                                         Supplier<Boolean> get, Consumer<Boolean> set) {
         return CycleButton.onOffBuilder(get.get())
                 .create(x, y, w, 20, Component.literal(label), (btn, val) -> set.accept(val));
+    }
+
+    private AbstractWidget tintSwitch(int x, int y, int w, String label,
+                                      Supplier<Boolean> get, Consumer<Boolean> set) {
+        Button button = Button.builder(Component.empty(), b -> {
+            set.accept(!get.get());
+            b.setMessage(switchText(label, get.get()));
+        }).bounds(x, y, w, 16).build();
+        button.setMessage(switchText(label, get.get()));
+        return button;
+    }
+
+    private static Component switchText(String label, boolean on) {
+        return Component.literal(label + ": " + (on ? "§aon" : "§7off"));
+    }
+
+    /** Opens the colour editor (wheel + hex) for one tint slot; live preview, cancel restores. */
+    private AbstractWidget colorButton(int x, int y, int w, String label,
+                                       Supplier<String> get, Consumer<String> set,
+                                       Supplier<Boolean> enabledGet) {
+        String hex = String.format(Locale.ROOT, "#%06X", TintPalette.parse(get.get()) & 0xFFFFFF);
+        Button button = Button.builder(Component.literal(label + " " + hex),
+                b -> this.minecraft.setScreen(new ColorWheelScreen(this, label,
+                        TintPalette.parse(get.get()),
+                        rgb -> set.accept(String.format(Locale.ROOT, "#%06X", rgb & 0xFFFFFF))))
+        ).bounds(x, y, w, 18).build();
+        this.addRenderableOnly(swatch(get, enabledGet, x + w - 15, y + 3));
+        return button;
+    }
+
+    /** Render-only colour chip that sits on top of a colour button (never blocks clicks). */
+    private AbstractWidget swatch(Supplier<String> get, Supplier<Boolean> enabledGet, int x, int y) {
+        return new AbstractWidget(x, y, 12, 12, Component.empty()) {
+            @Override
+            protected void extractWidgetRenderState(GuiGraphicsExtractor graphics,
+                                                    int mouseX, int mouseY, float a) {
+                int rgb = TintPalette.parse(get.get());
+                int alpha = enabledGet.get() ? 0xFF000000 : 0x66000000;
+                graphics.fill(getX(), getY(), getX() + width, getY() + height, alpha | rgb);
+            }
+
+            @Override
+            protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput o) {
+                // decorative chip on top of a narrated button
+            }
+        };
     }
 
     private AbstractSliderButton slider(int x, int y, int w, String label,
@@ -103,21 +176,6 @@ public class JetStreamsConfigScreen extends Screen {
         };
         slider.setMessage(Component.literal(label + ": " + fmt.apply(get.getAsDouble())));
         return slider;
-    }
-
-    /** Opens the HSV colour wheel editor for one tint slot (live preview, cancel restores). */
-    private Button colorButton(int x, int y, int w, String label,
-                               Supplier<String> get, Consumer<String> set) {
-        String hex = shortHex(get.get());
-        return Button.builder(Component.literal(label + " " + hex), b ->
-                this.minecraft.setScreen(new ColorWheelScreen(this, label,
-                        TintPalette.parse(get.get()),
-                        rgb -> set.accept(String.format(Locale.ROOT, "#%06X", rgb & 0xFFFFFF)))
-        )).bounds(x, y, w, 20).build();
-    }
-
-    private static String shortHex(String hex) {
-        return String.format(Locale.ROOT, "#%06X", TintPalette.parse(hex) & 0xFFFFFF);
     }
 
     private static String fmt1(double v) {

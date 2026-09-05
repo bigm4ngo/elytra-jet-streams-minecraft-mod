@@ -140,8 +140,10 @@ public class ColorWheelWidget extends AbstractWidget {
     @Override
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
         int size = width;
+        // Source rect = the full texture (TEX x TEX), destination = the widget box; passing
+        // srcW/srcH explicitly keeps the UVs inside [0,1] so the disc never wraps or shears.
         graphics.blit(RenderPipelines.GUI_TEXTURED, WHEEL_TEXTURE,
-                getX(), getY(), 0.0F, 0.0F, size, size, TEX, TEX, -1);
+                getX(), getY(), 0.0F, 0.0F, size, size, TEX, TEX, TEX, TEX, -1);
         // Selector dot at the current hue/sat.
         double cx = getX() + width / 2.0 + Math.cos(hue * 2.0 * Math.PI) * saturation * (width / 2.0);
         double cy = getY() + height / 2.0 + Math.sin(hue * 2.0 * Math.PI) * saturation * (height / 2.0);

@@ -172,7 +172,12 @@ public final class StreamParticleSpawner {
                 hit.flowX() * speed, 0.0, hit.flowZ() * speed);
     }
 
-    /** Looks for a tunnel near the player (velocity-ahead, lateral, vertical) for approach rim FX. */
+    /**
+     * Looks for a tunnel near the player for approach rim FX. Probes ahead along the
+     * velocity at several distances first (the player's heading is prioritized), then
+     * lateral and vertical neighbors - so a tunnel mouth lights up from hundreds of
+     * blocks away while you still have time to steer.
+     */
     private static TunnelField.Hit probeNear(ClientLevel level, LocalPlayer player,
                                              double px, double py, double pz,
                                              JetStreamsConfig.Physics p) {
@@ -182,15 +187,17 @@ public final class StreamParticleSpawner {
         if (vh > 0.01) {
             vx /= vh;
             vz /= vh;
-            TunnelField.Hit h = WindField.tunnelHit(level,
-                    px + vx * 40.0, py + 2.0, pz + vz * 40.0, p);
-            if (h != null) {
-                return h;
+            for (double ahead : new double[]{60.0, 160.0, 320.0}) {
+                TunnelField.Hit h = WindField.tunnelHit(level,
+                        px + vx * ahead, py + 2.0, pz + vz * ahead, p);
+                if (h != null) {
+                    return h;
+                }
             }
         }
-        double[] offsX = {40, -40, 0, 0, 0, 0};
-        double[] offsY = {0, 0, 0, 0, 45, -45};
-        double[] offsZ = {0, 0, 40, -40, 0, 0};
+        double[] offsX = {60, -60, 0, 0, 0, 0};
+        double[] offsY = {0, 0, 0, 0, 60, -60};
+        double[] offsZ = {0, 0, 60, -60, 0, 0};
         for (int i = 0; i < 6; i++) {
             TunnelField.Hit h = WindField.tunnelHit(level,
                     px + offsX[i], py + offsY[i], pz + offsZ[i], p);

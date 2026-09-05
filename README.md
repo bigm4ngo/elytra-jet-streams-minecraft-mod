@@ -117,11 +117,13 @@ bleeds momentum — take the curves wide or drop out of the stream to slow down.
   (`1 − e^(−k·(y−300))`, ~88% darkening at y=8000), horizon fog included.
 - **Direction tints** — while gliding, a subtle screen tint tells you which cardinal
   direction the current carries you (N/S/E/W) and a softer neutral tone appears in
-  neutral zones.
+  neutral zones. Every direction's tint can be switched off individually (including the
+  neutral one), so you keep only the cues you want.
 - **Headwind indicator** — a faint warm tint creeps in at the screen edges while
   you fight a headwind.
-- **Colour wheel** — every tint slot (N/S/E/W + neutral) opens an HSV colour wheel editor
-  (click/drag to pick hue + saturation, slider for brightness, live hex readout).
+- **Colour wheel + hex** — every tint slot (N/S/E/W + neutral) opens an HSV colour wheel
+  editor (click/drag for hue + saturation, slider for brightness) *and* accepts a pasted
+  `#RRGGBB` code in the hex field; both update the preview live.
 
 All FX are client-side, toggleable, budgeted, and disabled below the activation altitude.
 
@@ -167,7 +169,10 @@ corridor travel; the preloader's per-tick budget spreads the rest of the work ou
 4. Fire rockets to accelerate; the higher you are, the harder they push.
 5. At a crossing, keep your lane or steer into the other current for a moment to switch.
 6. To descend: **sneak** to brake and sink, or pitch down past **40°** to dive out.
-7. `/jetstreams info` shows your region, the tunnel's dimensions, multipliers and cruise
+7. Lost? `/jetstreams locate <north|south|east|west>` (operator only) reports the nearest
+   point **inside** a stream flowing that way — coordinates, distance and tunnel size,
+   with a click-to-teleport suggestion.
+8. `/jetstreams info` shows your region, the tunnel's dimensions, multipliers and cruise
    targets.
 
 ## 📦 Installation
@@ -185,8 +190,10 @@ cosmetic values stay local.
 
 Install [ModMenu](https://modrinth.com/mod/modmenu) and its **ModMenu → Elytra Jet Streams →
 Configure** screen gives you one tab: **Visuals** — every cosmetic toggle, particle density,
-tint strengths, and the per-direction **colour wheel** editors. Editable client side by
-**anyone**, applied instantly, saved locally.
+tint strengths, and the per-direction colour editors (colour wheel **or** pasted hex code),
+plus a row of per-direction tint on/off switches. Editable client side by **anyone**,
+applied instantly, saved locally. The colour block is anchored above the Done button so
+it never covers another setting.
 
 Since v1.2.0, **physics settings are no longer in the screen** — they live exclusively in
 the config file (operator territory, applied via `/jetstreams reload`). This keeps the
@@ -209,10 +216,10 @@ ModMenu is **optional** — the mod works fine without it (edit the JSON instead
 | `tunnelHeightMin` / `Max` | `100` / `150` | Tunnel height range at the base altitude. |
 | `tunnelHeightMinHigh` / `MaxHigh` | `600` / `2000` | Tunnel height range at the scale altitude and above. |
 | `tunnelLengthMin` / `Max` | `500` / `2000` | Tunnel length range at the base altitude. |
-| `tunnelLengthMinHigh` / `MaxHigh` | `8000` / `14000` | Tunnel length range at the scale altitude and above (a rare fat tail can push lengths past 20k). |
+| `tunnelLengthMinHigh` / `MaxHigh` | `8000` / `14000` | Tunnel length range at the scale altitude and above (a rare fat tail can push lengths to ~1.6× the max). |
 | `tunnelGapMin` / `Max` | `150` / `350` | Guaranteed minimum wall-to-wall gap between neighboring tunnels at the base altitude. |
 | `tunnelGapMinHigh` / `MaxHigh` | `800` / `1200` | Same guarantee at the scale altitude. |
-| `tunnelExistenceChance` | `0.7` | Probability a lattice slot actually contains a tunnel (probabilistic spacing). |
+| `tunnelExistenceChance` | `0.8` | Probability a lattice slot actually contains a tunnel (probabilistic spacing). |
 | `tunnelDistributionTightness` | `1.0` | Bell-curve sigma scaler — higher clusters sizes toward the middle of each range. |
 | `directionMode` | `ALTERNATING` | `ALTERNATING` guarantees an opposite-direction lane next to every tunnel; `RANDOM` is fully random. |
 | `meanderFraction` | `0.18` | Centerline wobble as a fraction of tunnel width. |
@@ -261,8 +268,9 @@ ModMenu is **optional** — the mod works fine without it (edit the JSON instead
 | `cirrusBands` | `true` | Cirrus billboards inside large tunnels. |
 | `streamTints` | `true` | Per-direction screen tint while gliding. |
 | `tintStrength` | `0.7` | Global tint strength multiplier (0–2). |
-| `tintNorth` / `South` / `East` / `West` | `#7FB4FF` / `#FFB454` / `#59E0A0` / `#C77DFF` | Stream tint per flow direction (pick via colour wheel). |
-| `tintNeutral` | `#8C99A8` | Neutral-zone tint (pick via colour wheel). |
+| `tintNorth` / `South` / `East` / `West` | `#7FB4FF` / `#FFB454` / `#59E0A0` / `#C77DFF` | Stream tint per flow direction (pick via colour wheel or hex code). |
+| `tintNeutral` | `#8C99A8` | Neutral-zone tint (pick via colour wheel or hex code). |
+| `tintNorthEnabled` … `tintNeutralEnabled` | `true` | Per-direction tint switches (including the neutral zone tint) — turn off just the directions you find noisy. |
 | `headwindIndicator` | `true` | Warm edge tint while fighting a headwind. |
 
 ## 🛠 Building from source
